@@ -1,0 +1,82 @@
+[
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 1,
+    "index": 12288,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 1,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 1,
+    "index": 12288,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 257,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 1,
+    "index": 12288,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 65281,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 257,
+    "index": 12288,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 1,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 257,
+    "index": 12288,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 65281,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  }
+]

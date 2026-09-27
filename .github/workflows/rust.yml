@@ -1,0 +1,59 @@
+name: Rust application
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_HOME: ${{ github.workspace }}/tmp/toolchains/cargo
+      RUSTUP_TOOLCHAIN: 1.88.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check packaging, component selection and project website
+        run: |
+          python3 scripts/test_build.py
+          python3 scripts/test_rust_notices.py
+          python3 scripts/test_installer.py
+          python3 scripts/check_website.py
+      - name: Install development toolchain
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt,clippy
+          sudo apt-get update
+          sudo apt-get install -y libxml2 libxkbcommon-dev libwayland-dev libx11-dev
+      - uses: actions/cache@v4
+        id: llvm
+        with:
+          path: tmp/toolchains/llvm
+          key: llvm-22.1.8-linux-x64-df0e1ecf
+      - name: Prepare qualified helper compiler
+        run: |
+          python3 scripts/setup_llvm.py
+          echo "$PWD/tmp/toolchains/llvm/bin" >> "$GITHUB_PATH"
+      - name: Prepare pinned build assets
+        run: |
+          python3 scripts/build_game_catalog.py
+          python3 scripts/build_helper.py
+          cargo fetch --locked
+      - name: Check formatting and lint
+        run: |
+          cargo fmt --all --check
+          cargo clippy --locked --offline --workspace --all-targets -- -D warnings
+      - name: Test core and both interfaces without hardware
+        run: cargo test --locked --offline --workspace
+      - name: Check independent ARM helper
+        run: |
+          python3 -m venv tmp/arm-tests
+          tmp/arm-tests/bin/pip install unicorn==2.1.4
+          tmp/arm-tests/bin/python scripts/test_inlretro_flash.py

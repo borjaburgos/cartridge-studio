@@ -1,0 +1,21 @@
+[workspace]
+members = ["rust/cartridge-core", "rust/cartridge-worker", "rust/cartridge-cli", "rust/cartridge-app", "rust/cartridge-tui", "rust/cartridge-desktop"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0-beta.1"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/borjaburgos/cartridge-studio"
+homepage = "https://borjaburgos.github.io/cartridge-studio/"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cartridge-core = { path = "rust/cartridge-core" }
+cartridge-app = { path = "rust/cartridge-app" }
+
+[profile.release]
+lto = "thin"
+strip = true

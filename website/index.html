@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101716" />
+    <meta
+      name="description"
+      content="One native workbench for your cartridge collection. Read, back up, verify and write supported retro cartridges with INLretro, GBxCart RW and GB Operator."
+    />
+    <meta
+      property="og:title"
+      content="Cartridge Studio — Your cartridges. One studio."
+    />
+    <meta
+      property="og:description"
+      content="A Rust-powered workbench for retro gamers, homebrew makers and hardware explorers. Desktop, terminal and command line."
+    />
+    <meta property="og:type" content="website" />
+    <title>Cartridge Studio — Your cartridges. One studio.</title>
+    <link rel="icon" href="assets/studio.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header wrap">
+      <a class="brand" href="#" aria-label="Cartridge Studio home"
+        ><img src="assets/studio.svg" alt="" width="42" height="42" /><span
+          >Cartridge<span class="brand-second">Studio</span></span
+        ></a
+      >
+      <nav aria-label="Main navigation">
+        <a href="#interfaces">The app</a
+        ><a href="#compatibility">Compatibility</a><a href="#roadmap">Roadmap</a
+        ><a
+          class="nav-github"
+          href="https://github.com/borjaburgos/cartridge-studio"
+          >GitHub <span aria-hidden="true">↗</span></a
+        >
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">
+            <span class="small-rule"></span>FOR THE GAMES WE KEEP
+          </p>
+          <h1 id="hero-title">Your cartridges.<br /><em>One studio.</em></h1>
+          <p class="hero-intro">
+            A modern workbench for the games on your shelf and the next one
+            you’re building. Read, preserve, verify and rewrite supported
+            cartridges—all in one place.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="#download"
+              >Get Cartridge Studio <span aria-hidden="true">↓</span></a
+            ><a class="text-link" href="#compatibility"
+              >Find your reader <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <p class="hero-footnote">
+            Linux available now <span aria-hidden="true">/</span> macOS &amp;
+            Windows on the roadmap
+          </p>
+        </div>
+        <div class="hero-product">
+          <div class="product-caption">
+            <span>CARTRIDGE STUDIO</span><span>NATIVE RUST · DESKTOP</span>
+          </div>
+          <a
+            href="assets/desktop.png"
+            aria-label="View the full Cartridge Studio desktop screenshot"
+            ><img
+              class="product-image"
+              src="assets/desktop.png"
+              alt="Cartridge Studio desktop with a homebrew Game Boy Color ROM and Ferrante 512 flash profile. Read, backup, verify, write and wipe controls share one workspace."
+              width="2000"
+              height="1400"
+              fetchpriority="high"
+          /></a>
+          <div class="product-note">
+            <span>REAL HARDWARE. YOUR CHOICE OF INTERFACE.</span
+            ><span>01 / GUI</span>
+          </div>
+        </div>
+      </section>
+      <div class="reader-strip">
+        <div class="wrap">
+          <span class="strip-label">THREE READER FAMILIES. ONE WORKFLOW.</span
+          ><span>INLretro</span><span>GBxCart RW</span
+          ><span>Epilogue GB Operator</span>
+        </div>
+      </div>
+      <section class="section wrap story" id="story">
+        <div>
+          <p class="eyebrow">WHY IT EXISTS</p>
+          <h2>The collection grew.<br />So did the pile of apps.</h2>
+        </div>
+        <div>
+          <p class="lead">
+            I had a bunch of readers lying around. Every reader meant another
+            app, another workflow and another set of quirks.
+          </p>
+          <p>
+            Cartridge Studio started at that workbench. The goal is simple: give
+            your collection a consistent home, wherever the cartridge came from
+            and whichever supported reader you own.
+          </p>
+          <p>
+            For the retro gamer preserving an old favorite. The homebrew
+            developer checking a new build. The DIYer, hardware hacker and
+            curious person who wants to see what’s on the board.
+          </p>
+        </div>
+      </section>
+      <section class="section wrap" id="interfaces">
+        <p class="eyebrow">ONE CORE. THREE WAYS IN.</p>
+        <div class="section-heading">
+          <h2>Works the way<br />you work.</h2>
+          <p>
+            The same Rust engine powers every interface. Choose the desktop,
+            stay in your terminal, or make cartridge checks part of your own
+            tools.
+          </p>
+        </div>
+        <div class="interface-grid">
+          <article>
+            <span class="index">01 / GUI</span>
+            <h3>A proper desktop.</h3>
+            <p>
+              A native window, a clear cartridge workspace, game information and
+              a visible history of your backups. No browser runtime.
+            </p>
+            <span class="tag">Iced · Linux</span>
+          </article>
+          <article>
+            <span class="index">02 / TUI</span>
+            <h3>All keys. No friction.</h3>
+            <p>
+              A full terminal interface with keyboard navigation, progress,
+              shared preferences and useful explanations when an action is
+              unavailable.
+            </p>
+            <span class="tag">Ratatui · Keyboard first</span>
+          </article>
+          <article>
+            <span class="index">03 / CLI</span>
+            <h3>Make it your pipeline.</h3>
+            <p>
+              Script reads, inspect ROMs, compare checksums and consume
+              structured JSON. Install only the interfaces you want.
+            </p>
+            <code>cartridge --json inspect game.gba</code>
+          </article>
+        </div>
+      </section>
+      <section class="section wrap" id="compatibility">
+        <p class="eyebrow">KNOW BEFORE YOU CONNECT</p>
+        <h2>Find your reader.<br />Meet your next project.</h2>
+        <p class="section-intro">
+          Five cartridge families, three reader drivers. Support depends on the
+          reader, firmware and physical board—not just the game’s name.
+        </p>
+        <div class="platforms" aria-label="Supported cartridge families">
+          <img src="assets/gameboy.svg" alt="Game Boy" /><img
+            src="assets/gameboy-color.svg"
+            alt="Game Boy Color"
+          /><img src="assets/gameboy-advance.svg" alt="Game Boy Advance" /><img
+            src="assets/nes.svg"
+            alt="NES"
+          /><img src="assets/famicom.svg" alt="Famicom" />
+        </div>
+        <div
+          class="table-scroll"
+          tabindex="0"
+          role="region"
+          aria-label="Reader compatibility table; scroll horizontally on small screens"
+        >
+          <table>
+            <caption>
+              Reader compatibility in Cartridge Studio 0.1.0-beta.1
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Reader</th>
+                <th scope="col">Read · back up · verify</th>
+                <th scope="col">Write · wipe</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">INLretro</th>
+                <td>Game Boy / Color, GBA*, NES &amp; Famicom</td>
+                <td>Ferrante 512 and Broke Studio UNROM-512 profiles*</td>
+              </tr>
+              <tr>
+                <th scope="row">GBxCart RW</th>
+                <td>
+                  Game Boy / Color &amp; GBA<br /><small
+                    >v1.3: GBA only · supported v1.4 firmware: GB/C + GBA</small
+                  >
+                </td>
+                <td>
+                  Ferrante 512<br /><small>PCB 6 / L14 firmware only*</small>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">GB Operator</th>
+                <td>Game Boy / Color &amp; GBA</td>
+                <td>Planned</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="support-note">
+          * Implementation and physical qualification are distinct. INLretro GBA
+          and native Rust programming need further hardware qualification.
+          Manual NROM reads also await physical qualification. GBxCart writing
+          is restricted to the exact Ferrante profile and PCB/firmware
+          combination.
+        </p>
+        <p>
+          <a
+            class="text-link"
+            href="https://github.com/borjaburgos/cartridge-studio/blob/main/docs/support.md"
+            >See boards, firmware and qualification details
+            <span aria-hidden="true">↗</span></a
+          >
+        </p>
+        <div class="board-detail">
+          <article>
+            <h3>Game Boy / Color</h3>
+            <p>
+              ROM-only, MBC1, MBC2, MBC3 and MBC5 ROMs. A supported mapper is a
+              reading capability; it does not establish that a board is
+              writable.
+            </p>
+          </article>
+          <article>
+            <h3>Game Boy Advance</h3>
+            <p>
+              Standard linear ROMs up to 32 MiB at 3.3 V. Two-pass verification,
+              exact catalog matching and a manual ROM-size override.
+            </p>
+          </article>
+          <article>
+            <h3>NES &amp; Famicom</h3>
+            <p>
+              Separate 72-pin and 60-pin slots. NROM-128/256 (mapper 0) and
+              Broke Studio UNROM-512 (mapper 30). Other mappers are future work.
+            </p>
+          </article>
+        </div>
+        <p class="support-note">
+          ROM operations only today. Saved games, RTC, SD-card flash cartridges
+          and special banked GBA boards are not supported yet. No games are
+          included.
+        </p>
+      </section>
+      <section class="preservation">
+        <div class="wrap section">
+          <p class="eyebrow">BUILT TO KEEP THE BYTES RIGHT</p>
+          <h2>A backup deserves<br />more than a progress bar.</h2>
+          <div class="feature-grid">
+            <article>
+              <span class="index">01</span>
+              <h3>Read twice. Compare.</h3>
+              <p>
+                Backup and verification compare two complete reads. Raw passes
+                and an operation report preserve the evidence.
+              </p>
+            </article>
+            <article>
+              <span class="index">02</span>
+              <h3>Identify by the data.</h3>
+              <p>
+                CRC32, SHA-1 and SHA-256 checksums. Known games match by full
+                hash and size, with optional artwork after identification.
+              </p>
+            </article>
+            <article>
+              <span class="index">03</span>
+              <h3>Make errors useful.</h3>
+              <p>
+                A wrong slot, unreadable header or unsupported board comes with
+                a next step. Destructive actions require a matching flash
+                profile and review.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section class="section wrap" id="roadmap">
+        <p class="eyebrow">THE NEXT CHAPTER</p>
+        <div class="section-heading">
+          <h2>A workbench<br />we can build together.</h2>
+          <p>
+            Public priorities, clear scope and room for your ideas. These are
+            planned features, not promises hidden in a download button.
+          </p>
+        </div>
+        <div class="roadmap-grid">
+          <a
+            class="roadmap-item"
+            href="https://github.com/borjaburgos/cartridge-studio/issues/2"
+            ><span class="tag">NEXT</span>
+            <h3>Read it. Launch it. Play.</h3>
+            <p>
+              Choose an emulator and start a verified dump from the cartridge in
+              your reader.
+            </p>
+            <span class="item-link">Track the feature ↗</span></a
+          ><a
+            class="roadmap-item"
+            href="https://github.com/borjaburgos/cartridge-studio/issues/9"
+            ><span class="tag">NEXT</span>
+            <h3>Save the memories, too.</h3>
+            <p>
+              Saved-game backups and restores, followed by exporting your Game
+              Boy Camera photos.
+            </p>
+            <span class="item-link">Track the feature ↗</span></a
+          ><a
+            class="roadmap-item"
+            href="https://github.com/borjaburgos/cartridge-studio/issues/5"
+            ><span class="tag">PLANNED</span>
+            <h3>Every desktop feels at home.</h3>
+            <p>
+              Native macOS and Windows apps, with tested installers and hardware
+              support.
+            </p>
+            <span class="item-link">Track the feature ↗</span></a
+          ><a
+            class="roadmap-item"
+            href="https://github.com/borjaburgos/cartridge-studio/issues/8"
+            ><span class="tag">PLANNED</span>
+            <h3>Give every slot a job.</h3>
+            <p>
+              Bring SNES / Super Famicom, Nintendo 64 and Mega Drive / Genesis
+              into the same workflow.
+            </p>
+            <span class="item-link">Track the feature ↗</span></a
+          ><a
+            class="roadmap-item"
+            href="https://github.com/borjaburgos/cartridge-studio/issues/4"
+            ><span class="tag">RESEARCH</span>
+            <h3>Understand what you own.</h3>
+            <p>
+              Show evidence of original, reproduction or modified hardware. A
+              matching ROM alone cannot prove authenticity.
+            </p>
+            <span class="item-link">Track the feature ↗</span></a
+          ><a
+            class="roadmap-item"
+            href="https://github.com/borjaburgos/cartridge-studio/issues/7"
+            ><span class="tag">ONGOING</span>
+            <h3>Download. Install. Start.</h3>
+            <p>
+              Self-contained packages with no extra application runtime and a
+              broader tested OS baseline.
+            </p>
+            <span class="item-link">Track the feature ↗</span></a
+          >
+        </div>
+      </section>
+      <section class="section wrap download" id="download">
+        <p class="eyebrow">BRING YOUR CARTRIDGES</p>
+        <h2>Your next backup<br />starts here.</h2>
+        <p class="section-intro">
+          First public beta · <strong>0.1.0-beta.1</strong> · Choose GUI, TUI,
+          CLI—or all three—during installation.
+        </p>
+        <div class="download-grid">
+          <article class="download-current">
+            <div class="download-title">
+              <h3>Linux</h3>
+              <span class="tag">PUBLIC BETA</span>
+            </div>
+            <p>x86-64 · Arch Linux / Omarchy<br />Wayland or X11 desktop</p>
+            <a
+              class="button primary"
+              data-download="portable"
+              href="https://github.com/borjaburgos/cartridge-studio/releases/download/v0.1.0-beta.1/cartridge-studio-0.1.0-beta.1-linux-x86_64.tar.gz"
+              >Download Linux beta <span aria-hidden="true">↓</span></a
+            >
+            <div class="download-links">
+              <a
+                data-download="release"
+                href="https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.1"
+                >Arch packages &amp; release notes</a
+              ><a
+                data-download="checksums"
+                href="https://github.com/borjaburgos/cartridge-studio/releases/download/v0.1.0-beta.1/SHA256SUMS"
+                >SHA-256 checksums</a
+              >
+            </div>
+            <p class="fine-print">
+              Requires glibc 2.43 or newer. Desktop libraries are bundled;
+              Python, Node.js, Electron and libusb are not required. Other Linux
+              distributions can build from source.
+            </p>
+          </article>
+          <article>
+            <div class="download-title">
+              <h3>macOS</h3>
+              <span class="tag muted">COMING</span>
+            </div>
+            <p>
+              A native desktop app, terminal UI and CLI. Packaging, signing and
+              hardware testing are on the roadmap.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/borjaburgos/cartridge-studio/issues/5"
+              >Follow macOS development ↗</a
+            >
+          </article>
+          <article>
+            <div class="download-title">
+              <h3>Windows</h3>
+              <span class="tag muted">COMING</span>
+            </div>
+            <p>
+              A native app with straightforward setup. USB transport, installers
+              and hardware testing come first.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/borjaburgos/cartridge-studio/issues/6"
+              >Follow Windows development ↗</a
+            >
+          </article>
+        </div>
+        <p class="install-link">
+          First time?
+          <a
+            href="https://github.com/borjaburgos/cartridge-studio/blob/main/docs/install.md"
+            >Read the installation guide</a
+          >
+          for component choices and USB access.
+        </p>
+      </section>
+      <section class="community wrap section" id="contribute">
+        <div>
+          <p class="eyebrow">MADE IN THE OPEN</p>
+          <h2>Your weird board<br />is welcome here.</h2>
+          <p class="lead">Open source. MIT licensed. Built together.</p>
+          <p>
+            Test a reader. Document a board. Improve a screen. Tell us where the
+            instructions stopped making sense. Help make cartridge preservation
+            easier for the next person.
+          </p>
+          <div class="actions">
+            <a
+              class="button primary"
+              href="https://github.com/borjaburgos/cartridge-studio/issues/new/choose"
+              >Suggest a feature <span aria-hidden="true">↗</span></a
+            ><a
+              class="text-link"
+              href="https://github.com/borjaburgos/cartridge-studio/blob/main/CONTRIBUTING.md"
+              >Contributor guide ↗</a
+            >
+          </div>
+        </div>
+        <aside class="api-note">
+          <span class="index">FOR BUILDERS</span>
+          <h3>Need an API?</h3>
+          <p>
+            Start with the CLI and its JSON output. They already give scripts
+            access to the same cartridge core used by the desktop.
+          </p>
+          <p>
+            A stable Rust library or optional local API can follow real
+            integration needs. Tell us what you want to connect.
+          </p>
+          <code>cartridge --json profiles</code
+          ><a
+            href="https://github.com/borjaburgos/cartridge-studio/blob/main/docs/architecture.md"
+            >Explore the architecture ↗</a
+          >
+        </aside>
+      </section>
+    </main>
+    <footer class="wrap site-footer">
+      <a class="brand" href="#"
+        ><img src="assets/studio.svg" alt="" width="34" height="34" /><span
+          >Cartridge Studio</span
+        ></a
+      >
+      <p>
+        Independent software for the hardware you love.<br />Nintendo and reader
+        names are trademarks of their respective owners. No affiliation or
+        endorsement.
+      </p>
+      <div>
+        <a href="https://github.com/borjaburgos/cartridge-studio">Source</a
+        ><a
+          href="https://github.com/borjaburgos/cartridge-studio/blob/main/LICENSE"
+          >License</a
+        ><a
+          href="https://github.com/borjaburgos/cartridge-studio/blob/main/desktop/assets/CREDITS.md"
+          >Credits</a
+        >
+      </div>
+    </footer>
+  </body>
+</html>

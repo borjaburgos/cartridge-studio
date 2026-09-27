@@ -1,0 +1,6 @@
+# Matches the environment used to verify the original cartridge readback.
+pyboy==2.7.0
+numpy==2.3.5
+Pillow==12.3.0
+PySDL2==0.9.17
+pysdl2-dll==2.32.10

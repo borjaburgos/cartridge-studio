@@ -1,0 +1,26 @@
+[
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 257,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 257,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  },
+  {
+    "direction": "in",
+    "request": 12,
+    "value": 32513,
+    "index": 8192,
+    "length": 1,
+    "response": "00"
+  }
+]

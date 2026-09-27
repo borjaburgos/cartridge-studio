@@ -1,0 +1,22 @@
+[package]
+name = "cartridge-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "cartridge-studio"
+path = "src/main.rs"
+
+[dependencies]
+cartridge-app.workspace = true
+serde_json.workspace = true
+iced = { version = "0.14.0", default-features = false, features = ["tiny-skia", "image-without-codecs", "svg", "tokio", "x11", "wayland", "advanced", "fira-sans"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[dev-dependencies]
+tempfile = "3"
+iced_test = "0.14.0"

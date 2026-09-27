@@ -1,0 +1,14 @@
+{
+  "sha256": "8cc5079eceb93a19e3a09d435cf813411444a27326f6a681d31b926a24a3da47",
+  "link_base": 536870912,
+  "relocations": [
+    280
+  ],
+  "source_sha256": "439e25a5ea24f1ea71dcb3cf774f9d605fedb47b44ca61ad9de864832d2b2e95",
+  "verified_link_addresses": [
+    "0x20000000",
+    "0x200004f8",
+    "0x20000500",
+    "0x20001600"
+  ]
+}

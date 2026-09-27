@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a workflow, interface improvement or integration.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the user need and what is difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired behavior
+      description: Describe a concrete successful workflow, including which interface or OS it affects.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and related roadmap items
+      description: Link existing issues or roadmap IDs and describe any workaround.
+  - type: textarea
+    id: contribution
+    attributes:
+      label: Evidence or ways you can help
+      description: Examples, documentation, mockups or testing availability. Contributions are optional.

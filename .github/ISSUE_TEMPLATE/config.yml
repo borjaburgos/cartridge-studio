@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Supported hardware and troubleshooting
+    url: https://github.com/borjaburgos/cartridge-studio/blob/main/docs/support.md
+    about: Check reader, firmware and board limits before requesting support.
+  - name: Feature roadmap
+    url: https://github.com/borjaburgos/cartridge-studio/blob/main/docs/roadmap.md
+    about: Find planned work and its acceptance criteria.
+  - name: Security reporting
+    url: https://github.com/borjaburgos/cartridge-studio/blob/main/SECURITY.md
+    about: Read how to report sensitive issues privately.

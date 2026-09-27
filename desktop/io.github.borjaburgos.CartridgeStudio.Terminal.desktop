@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Cartridge Studio (Terminal)
+Comment=Keyboard-driven cartridge backups, checksums, verification and restoration
+Exec=cartridge-tui %f
+Icon=io.github.borjaburgos.CartridgeStudio
+Terminal=true
+Categories=Utility;Game;ConsoleOnly;
+Keywords=Game Boy;Famicom;NES;ROM;Cartridge;INLretro;TUI;
+StartupNotify=false

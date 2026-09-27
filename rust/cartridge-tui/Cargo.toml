@@ -1,0 +1,17 @@
+[package]
+name = "cartridge-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+cartridge-app.workspace = true
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "layout-cache"] }
+crossterm = "0.29"
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

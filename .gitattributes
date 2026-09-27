@@ -1,0 +1,6 @@
+# Preserve the exact upstream logo downloads, including the Game Boy SVG's CRLF.
+desktop/assets/famicom.svg -text
+desktop/assets/gameboy.svg -text -whitespace
+desktop/assets/gameboy-color.svg -text
+desktop/assets/gameboy-advance.svg -text -whitespace
+website/assets/*.svg -text -whitespace

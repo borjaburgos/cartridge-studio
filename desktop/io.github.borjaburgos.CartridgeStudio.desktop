@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Cartridge Studio
+Comment=Read, preserve, verify, and restore supported game cartridges
+Exec=cartridge-studio %f
+Icon=io.github.borjaburgos.CartridgeStudio
+Terminal=false
+Categories=Utility;Game;
+Keywords=Game Boy;Game Boy Advance;GBA;Famicom;NES;ROM;Cartridge;INLretro;GBxCart;GB Operator;
+MimeType=application/x-gameboy-rom;application/x-gameboy-color-rom;application/x-nes-rom;application/x-gba-rom;
+StartupNotify=true
+StartupWMClass=io.github.borjaburgos.CartridgeStudio

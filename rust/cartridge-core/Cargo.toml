@@ -1,0 +1,27 @@
+[package]
+name = "cartridge-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+sha1 = "0.10"
+crc32fast = "1"
+hex = "0.4"
+nusb = "0.2.7"
+serialport = { version = "4.10.1", default-features = false }
+fs2 = "0.4"
+libc = "0.2"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+rusqlite = { version = "0.38", features = ["bundled", "serialize"] }
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"

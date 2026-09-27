@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a reproducible application, reading or recovery problem.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include evidence we can act on. Do not upload commercial ROMs, BIOS files, private saves or device serial numbers. Use SECURITY.md for vulnerability reporting.
+  - type: input
+    id: version
+    attributes:
+      label: Cartridge Studio version and installation
+      placeholder: "0.1.0-beta.1; portable Linux; GUI + CLI"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and interface
+      placeholder: "Arch Linux x86-64; Wayland; GUI / TUI / CLI"
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Reader and cartridge
+      description: Model, PCB revision, firmware, physical slot and selected board profile. Say offline if no device was involved.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and expected result
+      description: What did you do, what happened, and what should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Error and evidence
+      description: Error code, redacted report, screenshots or a minimal synthetic reproduction. State whether a write/erase had started and which backups remain.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Shared material
+      options:
+        - label: I removed private data and did not attach commercial ROMs, BIOS files or private saves.
+          required: true

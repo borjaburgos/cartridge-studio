@@ -1,0 +1,39 @@
+name: Reader or cartridge support
+description: Request a new reader, cartridge board, mapper or qualification test.
+title: "[Hardware]: "
+body:
+  - type: input
+    id: reader
+    attributes:
+      label: Reader model, PCB revision and firmware
+      description: Mark unknown fields as unknown. Do not include a device serial number.
+    validations:
+      required: true
+  - type: input
+    id: cartridge
+    attributes:
+      label: Cartridge, platform and physical board
+      description: Include mapper/chip markings if known; a game title alone may not identify the board.
+    validations:
+      required: true
+  - type: dropdown
+    id: operation
+    attributes:
+      label: Requested operation
+      options:
+        - ROM read / backup / verify
+        - ROM write / wipe
+        - Saved-game backup / restore
+        - Other peripheral feature
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: References and available evidence
+      description: Manufacturer pages, protocol documentation, your PCB photos, redacted errors and ROM hashes/sizes. Do not attach ROMs or saves.
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing availability
+      description: Which hardware and OS can you test? Requesting support does not authorize destructive tests.

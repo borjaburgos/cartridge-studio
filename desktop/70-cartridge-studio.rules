@@ -1,0 +1,3 @@
+# Exact cartridge-reader identities used by Cartridge Studio.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="16c0", ATTR{idProduct}=="05dc", ATTR{manufacturer}=="InfiniteNesLives.com", ATTR{product}=="INL Retro-Prog", TAG+="uaccess"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="16d0", ATTR{idProduct}=="123d", ATTR{manufacturer}=="Epilogue", ATTR{product}=="GB Operator", TAG+="uaccess"
