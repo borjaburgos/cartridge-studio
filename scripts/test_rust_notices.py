@@ -49,10 +49,25 @@ class LicenseNotices(unittest.TestCase):
         self.assertIn('not a replacement', records[0]['notices'][0]['note'])
 
     def test_upstream_declaration_is_not_a_complete_license(self):
-        package = self.package('dispatch', '0.2.0')
+        package = self.package('hexf-parse', '0.2.1')
         (Path(package['manifest_path']).parent / 'LICENSE').write_text('License declaration only')
-        with self.assertRaisesRegex(RuntimeError, 'dispatch-0.2.0'):
-            notices.collect([package], {'dispatch-0.2.0'}, self.output, offline=True)
+        with self.assertRaisesRegex(RuntimeError, 'hexf-parse-0.2.1'):
+            notices.collect([package], {'hexf-parse-0.2.1'}, self.output, offline=True)
+
+    def test_reviewed_declaration_adds_pinned_standard_text(self):
+        package = self.package(
+            'dispatch', '0.2.0', repository='http://github.com/SSheldon/rust-dispatch'
+        )
+        source = Path(package['manifest_path']).parent
+        (source / '.cargo_vcs_info.json').write_text(json.dumps({
+            'git': {'sha1': '82d6c7a5b75dc0c71c3f46f87bb6c16a476f7748'}
+        }))
+        canonical = b'Canonical MIT fixture text\n'
+        with patch.object(notices, 'fetch_notice', return_value=canonical):
+            records = notices.collect([package], {'dispatch-0.2.0'}, self.output, offline=True)
+        self.assertEqual(records[0]['notice_status'], 'complete')
+        self.assertEqual(records[0]['license_choice'], 'MIT')
+        self.assertEqual((self.output / 'dispatch-0.2.0/LICENSE-MIT.txt').read_bytes(), canonical)
 
     def test_authors_file_counts_only_for_reviewed_r_efi_versions(self):
         package = self.package('r-efi', '5.3.0')

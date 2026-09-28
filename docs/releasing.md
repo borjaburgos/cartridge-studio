@@ -7,8 +7,9 @@ artwork must never be published.
 
 ## Prepare a release
 
-1. Update the workspace version in `Cargo.toml`, the release notes, README and
-   the versioned links in `website/index.html`. Refresh `Cargo.lock` by building.
+1. Update the workspace version in `Cargo.toml`, the release notes and README.
+   Refresh `Cargo.lock` by building. Update `website/downloads.toml` and matching
+   links only for a platform release whose public assets are ready.
 2. Run the offline Rust checks and Python packaging tests documented in
    [development](development.md). Run `python3 scripts/check_website.py`.
 3. On the qualified Arch x86-64 build host, run
@@ -24,6 +25,14 @@ artwork must never be published.
    machine inventory is omitted from public packages. Complete local packages
    remain under ignored `tmp/` for diagnostics.
 
+For an Apple Silicon macOS candidate, run `python3 scripts/build_macos.py` and
+`python3 scripts/test_macos_package.py` on the qualified Mac. Inspect the DMG and
+all selectable PKG payloads, linkage, architecture, deployment target, notices and
+checksums. Pass Developer ID identity names and a notarytool keychain profile only
+when already available in secure storage. Never store credentials in the checkout.
+Without them, retain the ad-hoc local candidate and state that it is neither
+Developer ID signed nor notarized; do not weaken Gatekeeper for validation.
+
 ## Publish matching source and binaries
 
 Commit the reviewed source and documentation. Update `main` with the reviewed
@@ -37,16 +46,17 @@ do not label them as a stable or latest release. The website pins the beta tag
 because GitHub’s stable `releases/latest` endpoint excludes prereleases.
 Preserve published public release tags.
 
-The six artifacts are the portable `.tar.gz` archive, the Arch all-interface
+The six Linux artifacts are the portable `.tar.gz` archive, the Arch all-interface
 metapackage, and the Arch `core`, `gui`, `tui` and `cli` packages. The Arch
 metapackage alone is not a complete installation; include its dependencies.
 Cargo and portable archives use SemVer (`0.1.0-beta.1`); Arch packages use
 `0.1.0beta1`, which sorts before `0.1.0` in pacman. All split-package dependencies
 must use the same Arch version.
 
-The project website pins a specific verified release. Its download URLs must
-only advance after the corresponding assets exist. This avoids silently sending
-people to unrelated future release assets with different names or requirements.
+The project website pins a specific verified release per platform in
+`website/downloads.toml`. Its download URLs must only advance after corresponding
+public assets exist. A draft Mac candidate may therefore use a newer source
+version while Linux remains pinned to its published assets, without broken links.
 
 ## Publish the website
 

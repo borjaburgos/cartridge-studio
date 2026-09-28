@@ -57,9 +57,33 @@ tmp/rust-target/release/cartridge-studio --no-device
 tmp/rust-target/release/cartridge-tui --no-device
 ```
 
-macOS source paths exist but packaging and hardware are not qualified. Windows
-porting is outstanding; Unix-specific serial, process and filesystem assumptions
-must be resolved rather than treating a successful library build as product support.
+## Build on Apple Silicon macOS
+
+Use Xcode command line tools, Rust 1.88, Python 3.11 or newer and macOS 13.0 as
+the deployment target. `scripts/setup_llvm.py` selects the pinned official
+LLVM 22.1.8 macOS ARM64 archive, verifies its SHA-256, retains only the required
+tools and reproduces the embedded helper without changing its manifest.
+
+```sh
+python3 scripts/setup_llvm.py
+export PATH="$PWD/tmp/toolchains/llvm/bin:$PATH"
+export CARGO_HOME="$PWD/tmp/toolchains/cargo"
+export MACOSX_DEPLOYMENT_TARGET=13.0
+python3 scripts/build_macos.py
+python3 scripts/test_macos_package.py
+```
+
+The candidate app, DMG, selectable PKG, notices and `SHA256SUMS` are under
+`tmp/dist-macos/`. Without credentials the script ad-hoc signs the app and leaves
+the product package unsigned; it never describes that output as Developer ID
+signed or notarized. Release operators can pass `--application-identity`,
+`--installer-identity` and `--notary-profile` names that already exist in secure
+macOS credential storage. Secrets and private key material are never arguments or files.
+
+Packaging rejects non-Apple-Silicon hosts. Intel and Universal binaries require
+their own build and qualification. Windows porting remains outstanding; platform
+transport, process and filesystem assumptions must be resolved rather than treating
+a successful library build as product support.
 
 ## Offline checks
 
@@ -107,7 +131,8 @@ source paths are normalized for privacy. Review the package
 inventory: include intentional runtime docs and notices; exclude source-only
 research, ROMs, saves, artwork caches, device logs and untracked experiments.
 The portable archive and split Arch packages must have the same version and
-support claims. Packaging is currently a Linux/Arch workflow.
+support claims. The macOS workflow is independent so the website can keep Linux
+downloads pinned to published assets while a newer Mac candidate remains draft.
 
 For an explicitly requested local install:
 

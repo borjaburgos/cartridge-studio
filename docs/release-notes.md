@@ -1,5 +1,51 @@
 # Release notes
 
+## 0.1.0-beta.2 — macOS arm64 release candidate
+
+This candidate adds the first native macOS distribution while keeping the Linux
+0.1.0-beta.1 downloads pinned to their published assets. It targets Apple Silicon
+(`arm64`) and macOS 13.0 or newer. Intel and Universal builds remain separate,
+unqualified targets.
+
+### macOS candidate
+
+- A Retina-aware `Cartridge Studio.app` with a native application menu, About,
+  Settings, standard Edit/Window commands, Command-key shortcuts, native ROM
+  open/save panels, Finder/Dock reopen behavior and safe cancellation before quit.
+- A DMG for the self-contained GUI and a standard Installer package with separate
+  GUI, TUI and CLI choices. The shared worker is always installed; GUI-only and
+  terminal-only selections do not depend on each other. Re-running the installer
+  changes the managed selection without touching Application Support backups or settings.
+- Native paths use `~/Library/Application Support/Cartridge Studio`, while an
+  existing `~/Library/Application Support/INL` library remains in place and is reused.
+- All bundled executables are Apple Silicon Mach-O files with a macOS 13.0
+  deployment target and system-framework-only dynamic linkage. No Homebrew,
+  Python, browser shell, compiler or development `PATH` is required after installation.
+- The pinned LLVM 22.1.8 Apple Silicon toolchain reproduces the embedded helper
+  byte-for-byte and retains relocation/integrity checks. Pinned catalog inputs and
+  the actual macOS release dependency graph pass the enforced notice gate.
+- macOS CI builds and tests the unsigned packages without credentials while
+  preserving the Linux CI job.
+
+The native menu, About panel, Settings shortcut, standard editing commands,
+filtered Open and Save panels, close/reopen behavior, small-window notice and
+Finder launch were exercised from the packaged DMG. Finder launch also started
+the bundled worker without a development `PATH` and returned macOS-specific
+reader guidance. The complete record and synthetic screenshot names are in
+[macOS candidate validation](macos-validation.md).
+
+Keyboard focus routing is implemented and regression-tested, and native panels
+and menus expose their normal accessibility elements. Iced 0.14 does not expose
+the Rust-rendered workspace widgets as a semantic macOS accessibility tree,
+however, so VoiceOver operation of the main workspace remains unqualified.
+
+This locally built candidate is **ad-hoc signed, not Developer ID signed, not
+notarized and not stapled** because no suitable identities or notary credentials
+were available on the qualification Mac. Gatekeeper acceptance is therefore not
+claimed. Finder/UI and synthetic offline qualification are recorded separately;
+no physical reader/cartridge combination is qualified for macOS by this candidate.
+Write, wipe, restore, firmware update and save restoration were not performed.
+
 ## 0.1.0-beta.1 — First public beta
 
 Cartridge Studio brings several cartridge readers into one native Rust

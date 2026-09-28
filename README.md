@@ -40,10 +40,11 @@ results, automate work and help expand the supported hardware.
 
 ## First public beta
 
-**0.1.0-beta.1 is an early testing release.** Hardware coverage is deliberately
+**0.1.0-beta.1 is the published Linux beta; 0.1.0-beta.2 is the Apple Silicon
+macOS release candidate.** Hardware coverage is deliberately
 limited, and native Rust write/wipe still needs physical qualification. Keep
 verified backups and check the support table before using a cartridge. Report
-problems through the issue templates; macOS and Windows packages are not available.
+problems through the issue templates. Windows, Intel Mac and Universal Mac packages are not available.
 
 **Linux x86-64 ships now**, qualified on Arch Linux / Omarchy. The portable
 archive bundles its application libraries; split Arch packages are also available.
@@ -51,9 +52,11 @@ The current packages require **glibc 2.43 or newer**. The host supplies its kern
 and, for the GUI, a Wayland or X11 session. “Self-contained” means no separate application runtime to install;
 the project still uses and credits third-party libraries.
 
-macOS and Windows applications are on the [roadmap](docs/roadmap.md). macOS
-source paths exist, but there is no qualified Mac release yet. Windows needs
-platform work. Neither platform currently has a supported downloadable package.
+The Apple Silicon macOS candidate includes a native `.app`, DMG and selectable
+GUI/TUI/CLI installer for macOS 13.0 or newer. Its software and synthetic offline
+paths are qualified, but Mac reader/cartridge hardware qualification is pending.
+The local candidate is ad-hoc signed—not Developer ID signed or notarized—because
+credentials were unavailable. Windows remains on the [roadmap](docs/roadmap.md).
 The GUI uses native operating-system windows and Rust-rendered Iced controls.
 
 | Reader | Read, back up and verify | Write and wipe |
@@ -85,6 +88,12 @@ Check the archive checksum, extract it, then run its installer:
 ./install.sh                         # choose GUI, TUI and/or CLI
 ./install.sh --components tui,cli    # terminal and scripting only
 ```
+
+For the Apple Silicon 0.1.0-beta.2 candidate, verify the DMG or PKG against its
+`SHA256SUMS`. Drag the app from the DMG to Applications, or use **Customize** in
+the PKG to choose GUI, TUI and/or CLI. Do not disable Gatekeeper for the unsigned,
+unnotarized local candidate; general distribution still requires Developer ID
+signing and Apple notarization.
 
 The per-user installer preserves your library and settings. See the
 [installation guide](docs/install.md) for Arch packages, requirements and USB access.

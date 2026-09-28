@@ -44,16 +44,44 @@ pub fn binary(name: &str) -> Result<PathBuf> {
     if path.is_file() {
         return Ok(path);
     }
+    #[cfg(target_os = "macos")]
+    {
+        let installed = if name == "cartridge-worker" {
+            PathBuf::from("/usr/local/libexec/cartridge-studio/cartridge-worker")
+        } else {
+            PathBuf::from("/usr/local/bin").join(name)
+        };
+        if installed.is_file() {
+            return Ok(installed);
+        }
+    }
     let (code, action) = match name {
-        "cartridge-tui" => ("TUI_NOT_INSTALLED", "Rerun the installer and include TUI in your selection, or install the cartridge-studio-tui Arch package."),
-        "cartridge" => ("CLI_NOT_INSTALLED", "Rerun the installer and include CLI in your selection, or install the cartridge-studio-cli Arch package."),
-        _ => ("PROGRAM_NOT_FOUND", "Reinstall your selected Cartridge Studio interfaces to restore the shared cartridge engine. Keep their executables together."),
+        "cartridge-tui" => ("TUI_NOT_INSTALLED", missing_component_action("TUI")),
+        "cartridge" => ("CLI_NOT_INSTALLED", missing_component_action("CLI")),
+        _ => (
+            "PROGRAM_NOT_FOUND",
+            "Reinstall your selected Cartridge Studio interfaces to restore the shared cartridge engine. Keep their executables together."
+                .into(),
+        ),
     };
     Err(Error::new(
         code,
         format!("The application is missing {name}."),
-        action,
+        &action,
     ))
+}
+
+#[cfg(target_os = "linux")]
+fn missing_component_action(component: &str) -> String {
+    format!("Rerun the installer and include {component} in your selection, or install the matching cartridge-studio package for your distribution.")
+}
+#[cfg(target_os = "macos")]
+fn missing_component_action(component: &str) -> String {
+    format!("Rerun Cartridge Studio.pkg and include {component} in your component selection.")
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn missing_component_action(component: &str) -> String {
+    format!("Rerun the installer and include {component} in your component selection.")
 }
 
 pub struct Job {

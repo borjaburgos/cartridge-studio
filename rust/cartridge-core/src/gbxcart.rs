@@ -47,20 +47,41 @@ fn incompatible(detail: Value) -> Error {
     Error::new("GBXCART_FIRMWARE_UNSUPPORTED", "This reader or firmware is outside the supported GBxCart RW configuration.", "For GBA ROM reading, use GBxCart RW v1.3 with working software voltage selection, or v1.4/v1.4a/b/c with extended firmware L12–L15. Check the port and reader information; no firmware has been changed and the cartridge has not been accessed.")
         .details(detail).exit(3)
 }
+#[cfg(target_os = "linux")]
+fn serial_access_action() -> &'static str {
+    "Close FlashGBX and other cartridge applications. Grant your account access to this serial device using your distribution's serial-device group, sign in again, reconnect, and retry."
+}
+#[cfg(target_os = "macos")]
+fn serial_access_action() -> &'static str {
+    "Close FlashGBX and other cartridge applications, reconnect the reader directly, and retry. Choose the correct /dev/cu.usbserial port if it changed."
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn serial_access_action() -> &'static str {
+    "Close other cartridge applications, reconnect the reader directly, choose the correct serial port, and retry."
+}
 impl Reader {
     pub fn open(path: &str, cancel: Cancel) -> Result<Self> {
         cancel.check()?;
         let port = serialport::new(path, 1_000_000)
             .timeout(Duration::from_millis(100))
             .flow_control(serialport::FlowControl::None)
-            .open_native().map_err(|e| {
+            .open_native()
+            .map_err(|e| {
                 let code = match e.kind() {
-                    serialport::ErrorKind::Io(io::ErrorKind::PermissionDenied) => "SERIAL_PERMISSION_DENIED",
-                    serialport::ErrorKind::Io(io::ErrorKind::NotFound) | serialport::ErrorKind::NoDevice => "READER_DISCONNECTED",
+                    serialport::ErrorKind::Io(io::ErrorKind::PermissionDenied) => {
+                        "SERIAL_PERMISSION_DENIED"
+                    }
+                    serialport::ErrorKind::Io(io::ErrorKind::NotFound)
+                    | serialport::ErrorKind::NoDevice => "READER_DISCONNECTED",
                     _ => "SERIAL_OPEN_FAILED",
                 };
-                Error::new(code, format!("Cannot open the GBxCart serial port {path}."), "Close FlashGBX and other cartridge applications. On Linux, grant your account access to this serial device (or use your distribution's serial-device group and sign in again). Reconnect and retry; choose the correct port if it changed.")
-                    .details(json!({"port":path,"reason":e.to_string()})).exit(3)
+                Error::new(
+                    code,
+                    format!("Cannot open the GBxCart serial port {path}."),
+                    serial_access_action(),
+                )
+                .details(json!({"port":path,"reason":e.to_string()}))
+                .exit(3)
             })?;
         // TTYPort holds an exclusive OS lock. Opening does not assert DTR or reset firmware.
         Self::connect(Box::new(port), path, cancel)

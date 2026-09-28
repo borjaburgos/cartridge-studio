@@ -81,7 +81,7 @@ SUPPLEMENTAL = [
          ('LICENSE.txt', 'e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5'),
      )),
     ('madsmtm/objc2', '7b1abfd750a2cacaea71d6a56ecfb83cb7de560b',
-     'objc2-core-foundation-0.3.2 objc2-core-graphics-0.3.2 objc2-foundation-0.3.2 objc2-io-surface-0.3.2 objc2-quartz-core-0.3.2', (
+     'objc2-app-kit-0.3.2 objc2-core-foundation-0.3.2 objc2-core-graphics-0.3.2 objc2-foundation-0.3.2 objc2-io-surface-0.3.2 objc2-quartz-core-0.3.2', (
          ('LICENSE.md', '7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54'),
      )),
     ('madsmtm/objc2', '8852b424193ca41602281b3d7540d7c8ed51e49a',
@@ -127,6 +127,32 @@ DECLARATION_ONLY = {'dispatch-0.2.0', 'hexf-parse-0.2.1'} | {
     name for repository, _, names, files in SUPPLEMENTAL
     if repository == 'madsmtm/objc2' and files[0][0] == 'LICENSE.md'
     for name in names.split()
+}
+# Some upstream releases intentionally publish only an SPDX declaration (or a
+# declaration document linking the license) instead of copying the complete
+# grant into every crate archive. For the exact reviewed revisions below, keep
+# that upstream declaration and add the canonical SPDX text from a pinned
+# license-list-data commit. The Cargo authors remain in rust-components.json;
+# no copyright attribution is synthesized.
+STANDARD_LICENSE_TEXTS = {
+    'MIT': (
+        'spdx/license-list-data',
+        '31ba1a50e5397e00a304dbadc76531740e89ee48',
+        'text/MIT.txt',
+        'b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5',
+    ),
+}
+STANDARD_LICENSE_FALLBACKS = {
+    'dispatch-0.2.0': ('ssheldon/rust-dispatch', '82d6c7a5b75dc0c71c3f46f87bb6c16a476f7748', 'MIT'),
+    'block2-0.6.2': ('madsmtm/objc2', 'b4167b582b2f75f9a1be75495c41b765344fd03c', 'MIT'),
+    'dispatch2-0.3.1': ('madsmtm/objc2', '8852b424193ca41602281b3d7540d7c8ed51e49a', 'MIT'),
+    'objc2-0.6.4': ('madsmtm/objc2', '8852b424193ca41602281b3d7540d7c8ed51e49a', 'MIT'),
+    'objc2-app-kit-0.3.2': ('madsmtm/objc2', '7b1abfd750a2cacaea71d6a56ecfb83cb7de560b', 'MIT'),
+    'objc2-core-foundation-0.3.2': ('madsmtm/objc2', '7b1abfd750a2cacaea71d6a56ecfb83cb7de560b', 'MIT'),
+    'objc2-core-graphics-0.3.2': ('madsmtm/objc2', '7b1abfd750a2cacaea71d6a56ecfb83cb7de560b', 'MIT'),
+    'objc2-encode-4.1.0': ('madsmtm/objc2', '8d214f5477365ffcbcbb7de058c86ed9a518efb7', 'MIT'),
+    'objc2-foundation-0.3.2': ('madsmtm/objc2', '7b1abfd750a2cacaea71d6a56ecfb83cb7de560b', 'MIT'),
+    'objc2-quartz-core-0.3.2': ('madsmtm/objc2', '7b1abfd750a2cacaea71d6a56ecfb83cb7de560b', 'MIT'),
 }
 # winapi's target import-library crates share the repository-wide license and
 # author of winapi 0.3.9. Their archives omit it and have no VCS metadata.
@@ -258,7 +284,27 @@ def collect(packages, release_ids, output, offline=False):
                     data = fetch_notice(url, expected, offline)
                     provenance = {'origin': 'pinned-upstream', 'url': url, 'source_revision': revision}
                 include(filename, data, provenance)
-        if not record['notices'] or name in DECLARATION_ONLY:
+        if name in STANDARD_LICENSE_FALLBACKS:
+            repository, revision, license_id = STANDARD_LICENSE_FALLBACKS[name]
+            if record['source_revision'] != revision or repository_name(package.get('repository')) != repository:
+                raise RuntimeError(f'Upstream source changed for {name}; review its standard license mapping.')
+            if license_id not in (package.get('license') or '').split(' OR '):
+                raise RuntimeError(f'Upstream license declaration changed for {name}; review its standard license mapping.')
+            if not record['notices']:
+                include('UPSTREAM-Cargo.toml', (source / 'Cargo.toml').read_bytes(), {
+                    'origin': 'crate-archive', 'path_in_crate': 'Cargo.toml',
+                    'note': 'Exact release manifest containing the upstream SPDX license declaration.',
+                })
+            license_repository, license_revision, license_path, expected = STANDARD_LICENSE_TEXTS[license_id]
+            url = f'https://raw.githubusercontent.com/{license_repository}/{license_revision}/{license_path}'
+            include(f'LICENSE-{license_id}.txt', fetch_notice(url, expected, offline), {
+                'origin': 'pinned-standard-license-text', 'url': url,
+                'source_revision': license_revision, 'spdx_license': license_id,
+                'note': 'Canonical license text supplementing the exact upstream declaration.',
+            })
+            record['license_choice'] = license_id
+            record['standard_license_source'] = f'https://github.com/{license_repository}/tree/{license_revision}'
+        if not record['notices'] or (name in DECLARATION_ONLY and name not in STANDARD_LICENSE_FALLBACKS):
             record['notice_status'] = 'upstream-declaration-only' if name in DECLARATION_ONLY else 'missing'
             include('UPSTREAM-Cargo.toml', (source / 'Cargo.toml').read_bytes(), {
                 'origin': 'crate-archive', 'path_in_crate': 'Cargo.toml',

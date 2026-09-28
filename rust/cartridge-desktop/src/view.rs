@@ -559,7 +559,83 @@ fn history(state: &Desktop) -> Element<'_, Message> {
 fn settings(state: &Desktop) -> Element<'_, Message> {
     let settings = &state.app.settings;
     let idle = !state.app.busy();
-    scrollable(column![text("Make room for your collection").size(28), card(column![heading("LIBRARY FOLDER"), text_input("Absolute path to an existing folder", &state.library_path).on_input(Message::Library).padding(12).on_submit(Message::SaveSettings), text("Backups and reports are saved here. Changing this setting does not move previous files.").size(13).style(secondary), control("Save location", Message::SaveSettings, idle)].spacing(12)), card(column![heading("PREFERENCES"), checkbox(settings.double_read).label("Read cartridges twice and compare").on_toggle_maybe(idle.then_some(Message::Double)), checkbox(settings.strict_checksum).label("Require valid Game Boy checksums for ordinary reads").on_toggle_maybe(idle.then_some(Message::Strict)), checkbox(settings.download_artwork).label("Download artwork after a known game is read").on_toggle_maybe(idle.then_some(Message::Artwork)), checkbox(settings.color_scheme == 2).label("Light appearance").on_toggle_maybe(idle.then_some(Message::Light)), row![text("GBA read size").size(14), pick_list(if idle { cartridge_app::GbaSize::ALL.to_vec() } else { vec![] }, Some(settings.gba_size), Message::GbaSize)].spacing(16).align_y(Vertical::Center), text("Automatic GBA sizes from the catalog require an exact ROM hash. Choose 32 MiB to preserve the full address window. GBA header checks always apply.").size(12).style(secondary), text("Identification works offline. Artwork uses HTTPS and is cached locally.").size(13).style(secondary)].spacing(18)), card(column![heading("ABOUT CARTRIDGE STUDIO"), text(format!("Version {VERSION} · Rust core, desktop and terminal")), text("The desktop uses Iced; the terminal uses Ratatui. Controls and the offline catalog are built into the package. No separate Python, GTK or browser installation is needed.").size(14), text("Nintendo platform marks identify supported hardware. This independent application is not affiliated with Nintendo.").size(12).style(secondary)].spacing(12))].spacing(20).padding(24)).height(Fill).into()
+    let library_actions = row![control("Save location", Message::SaveSettings, idle)].spacing(10);
+    #[cfg(target_os = "macos")]
+    let library_actions =
+        library_actions.push(control("Choose folder…", Message::ChooseLibrary, idle));
+    scrollable(
+        column![
+            text("Make room for your collection").size(28),
+            card(
+                column![
+                    heading("LIBRARY FOLDER"),
+                    text_input("Absolute path to an existing folder", &state.library_path)
+                        .on_input(Message::Library)
+                        .padding(12)
+                        .on_submit(Message::SaveSettings),
+                    text("Backups and reports are saved here. Changing this setting does not move previous files.")
+                        .size(13)
+                        .style(secondary),
+                    library_actions
+                ]
+                .spacing(12)
+            ),
+            card(
+                column![
+                    heading("PREFERENCES"),
+                    checkbox(settings.double_read)
+                        .label("Read cartridges twice and compare")
+                        .on_toggle_maybe(idle.then_some(Message::Double)),
+                    checkbox(settings.strict_checksum)
+                        .label("Require valid Game Boy checksums for ordinary reads")
+                        .on_toggle_maybe(idle.then_some(Message::Strict)),
+                    checkbox(settings.download_artwork)
+                        .label("Download artwork after a known game is read")
+                        .on_toggle_maybe(idle.then_some(Message::Artwork)),
+                    checkbox(settings.color_scheme == 2)
+                        .label("Light appearance")
+                        .on_toggle_maybe(idle.then_some(Message::Light)),
+                    row![
+                        text("GBA read size").size(14),
+                        pick_list(
+                            if idle {
+                                cartridge_app::GbaSize::ALL.to_vec()
+                            } else {
+                                vec![]
+                            },
+                            Some(settings.gba_size),
+                            Message::GbaSize
+                        )
+                    ]
+                    .spacing(16)
+                    .align_y(Vertical::Center),
+                    text("Automatic GBA sizes from the catalog require an exact ROM hash. Choose 32 MiB to preserve the full address window. GBA header checks always apply.")
+                        .size(12)
+                        .style(secondary),
+                    text("Identification works offline. Artwork uses HTTPS and is cached locally.")
+                        .size(13)
+                        .style(secondary)
+                ]
+                .spacing(18)
+            ),
+            card(
+                column![
+                    heading("ABOUT CARTRIDGE STUDIO"),
+                    text(format!("Version {VERSION} · Rust core, desktop and terminal")),
+                    text("The desktop uses Iced; the terminal uses Ratatui. Controls and the offline catalog are built into the package. No separate Python, GTK or browser installation is needed.")
+                        .size(14),
+                    text("Nintendo platform marks identify supported hardware. This independent application is not affiliated with Nintendo.")
+                        .size(12)
+                        .style(secondary)
+                ]
+                .spacing(12)
+            )
+        ]
+        .spacing(20)
+        .padding(24),
+    )
+    .height(Fill)
+    .into()
 }
 fn modal(state: &Desktop) -> Element<'_, Message> {
     if let Some(review) = &state.app.review {

@@ -31,7 +31,7 @@ def compile_helper(base):
         raise RuntimeError('Building the embedded helper requires clang with its ARM/LLD backend and llvm-objcopy.')
     version = subprocess.check_output([compiler, '--version'], text=True)
     if not re.search(r'clang version 22\.1\.8(?:\s|$)', version):
-        raise RuntimeError('The qualified helper requires LLVM 22.1.8. On Linux x86-64, run python3 scripts/setup_llvm.py and add tmp/toolchains/llvm/bin to PATH. Do not change the helper integrity manifest to bypass this check.')
+        raise RuntimeError('The qualified helper requires LLVM 22.1.8. On a supported Linux or Apple Silicon macOS build host, run python3 scripts/setup_llvm.py and add tmp/toolchains/llvm/bin to PATH. Do not change the helper integrity manifest to bypass this check.')
     digest = sha(b''.join(path.read_bytes() for path in SOURCES))[:16]
     directory = DATA_DIR/'toolchains/inlretro-writer'/f'{base:08x}-{digest}'
     directory.mkdir(parents=True, exist_ok=True)

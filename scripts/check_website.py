@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Validate the static project website without a JavaScript toolchain or network.
 
-Versioned download links must match Cargo.toml. Local images, stylesheet links,
-page anchors and repository documentation targets must exist. GitHub release
-assets are verified separately during publication (see docs/releasing.md).
+Versioned download links match website/downloads.toml, not the source version:
+platform candidates can advance independently and unpublished drafts must never
+create broken public links. GitHub assets are verified during publication.
 """
 from html.parser import HTMLParser
 from pathlib import Path
@@ -49,14 +49,21 @@ class Page(HTMLParser):
 
 
 def main():
-    version = tomllib.loads((ROOT / 'Cargo.toml').read_text())['workspace']['package']['version']
+    releases = tomllib.loads((SITE / 'downloads.toml').read_text())
+    linux = releases['linux']
+    version = linux['version']
+    architecture = linux['architecture']
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-(?:alpha|beta|rc)\.[0-9]+)?', version):
+        raise SystemExit(f'Invalid pinned Linux release version: {version!r}')
+    if architecture not in ('x86_64', 'aarch64'):
+        raise SystemExit(f'Unexpected Linux architecture: {architecture!r}')
     page = Page()
     page.feed((SITE / 'index.html').read_text())
     errors = page.errors
     if not (page.lang == 'en' and page.has_title and page.has_viewport):
         errors.append('Missing language, title or responsive viewport metadata')
     expected = {
-        'portable': f'{REPO}/releases/download/v{version}/cartridge-studio-{version}-linux-x86_64.tar.gz',
+        'portable': f'{REPO}/releases/download/v{version}/cartridge-studio-{version}-linux-{architecture}.tar.gz',
         'release': f'{REPO}/releases/tag/v{version}',
         'checksums': f'{REPO}/releases/download/v{version}/SHA256SUMS',
     }
@@ -90,7 +97,7 @@ def main():
             errors.append(f'Private cartridge data does not belong on the website: {path.name}')
     if errors:
         raise SystemExit('\n'.join(errors))
-    print(f'Website checked: {len(page.links)} links/assets, accessible image labels, release v{version}.')
+    print(f'Website checked: {len(page.links)} links/assets, accessible image labels, Linux release v{version}.')
 
 
 if __name__ == '__main__':

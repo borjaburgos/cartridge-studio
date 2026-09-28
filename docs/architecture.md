@@ -78,6 +78,13 @@ by entry name; the worker still runs in its own process. This shares the embedde
 catalog on disk and avoids shipping two copies. A standalone worker binary is
 also available in development builds.
 
+On macOS the app finds its worker beside the GUI executable inside the bundle.
+Terminal components find the shared engine at
+`/usr/local/libexec/cartridge-studio/cartridge-worker`; CLI and TUI entrypoints
+remain independently selectable under `/usr/local/bin`. These are packaging
+discovery rules only—widgets still communicate with the worker client and never
+with USB transports directly.
+
 ## Packaging and dependencies
 
 `Cargo.lock` pins Rust libraries. Core data/helper assets are prepared by
@@ -93,8 +100,11 @@ The per-user installer creates a version folder and redirects launchers without
 changing previous app folders or backups. A custom build/test installation can
 use `CARTRIDGE_STUDIO_INSTALL_PREFIX`; the normal prefix is `~/.local`. Existing user library
 selection is preserved by `scripts/install_desktop.py` through `CARTRIDGE_STUDIO_DATA_DIR`.
-Mac-native source paths exist, but macOS release/signing and hardware qualification
-are not claimed by the Linux package. Windows requires additional transport,
+`scripts/build_macos.py` builds the Apple Silicon `.app`, DMG and selectable PKG,
+audits a macOS 13.0 deployment target and packages the same Rust engine without
+Homebrew runtime dependencies. Developer ID signing/notarization is conditional
+on identities and keychain credentials; local ad-hoc output is labeled accurately.
+macOS physical hardware qualification is not inferred from packaging. Windows requires additional transport,
 process and filesystem work; no Windows release is currently supported.
 
 ## Verification
