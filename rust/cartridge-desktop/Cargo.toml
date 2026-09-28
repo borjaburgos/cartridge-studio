@@ -17,6 +17,12 @@ serde_json.workspace = true
 iced = { version = "0.14.0", default-features = false, features = ["tiny-skia", "image-without-codecs", "svg", "tokio", "x11", "wayland", "advanced", "fira-sans"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = "0.17.1"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication"] }
+rfd = { version = "0.15.4", default-features = false }
+
 [dev-dependencies]
 tempfile = "3"
 iced_test = "0.14.0"

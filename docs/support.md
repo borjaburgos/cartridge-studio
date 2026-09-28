@@ -1,6 +1,7 @@
 # Hardware support and troubleshooting
 
-This is the supported envelope for the **first public beta, 0.1.0-beta.1**.
+This is the supported envelope for the **Linux beta 0.1.0-beta.1** and the
+**Apple Silicon macOS 0.1.0-beta.2 release candidate**.
 Treat it as a testing release; hardware coverage and physical qualification
 are incomplete. A platform name
 does not imply every cartridge, mapper or reader revision works. The application
@@ -20,6 +21,11 @@ GBxCart physical read qualification covers PCB 6 / L14 and PCB 4 / L1; accepting
 other listed protocol revisions does not mean they have all been physically
 tested. GB Operator read qualification covers device version 1.11. The software
 does not update any reader's firmware automatically.
+
+Those recorded physical results predate the macOS candidate and do not qualify
+reader behavior on macOS. The Mac candidate has compilation, simulated transport,
+enumeration-safe and synthetic offline coverage only until a named reader,
+firmware and cartridge complete two matching read-only passes on macOS.
 
 ## Cartridge profiles
 
@@ -74,7 +80,7 @@ graphics, audio and input where recorded, not completion of every game.
 
 | Message or symptom | Next action |
 | --- | --- |
-| No reader / access denied | Use Check USB or `cartridge doctor`; check a data-capable cable and the [Linux access setup](install.md#linux-device-access). |
+| No reader / access denied | Use Check USB or `cartridge doctor`; check a data-capable cable. On Linux use the [udev setup](install.md#linux-device-access); on macOS close other cartridge apps and reconnect directly. |
 | Several reader candidates | Select a reader family, specify a GBxCart `--port`, or disconnect extra candidates. A CH340 port alone is not proof of GBxCart identity. |
 | Reader busy | Close Playback, FlashGBX and any other process using that reader, then retry. |
 | Wrong platform / GBA indicator | Select the cartridge's actual family and slot. Disconnect USB before reseating or exchanging cartridges. |
@@ -84,6 +90,7 @@ graphics, audio and input where recorded, not completion of every game.
 | No database match | The game may be homebrew, patched, uncatalogued or differently padded. Inspect the read evidence; no match alone does not prove a bad read or bootleg. |
 | Artwork unavailable | ROM preservation is already complete. Retry Refresh artwork with a network connection and writable library, or use cached images offline. |
 | Window too small | Enlarge the GUI to 1000 × 700 logical pixels or terminal to 120 × 32 cells. Active operations continue; safe Stop remains available. |
+| VoiceOver cannot identify workspace controls on macOS | Native menus and file panels remain accessible, but the Iced 0.14 workspace lacks a semantic accessibility tree in this candidate. Use the keyboard-described TUI or CLI where appropriate and follow the release issue for native workspace accessibility. |
 | Interrupted write or unconfirmed cleanup | Keep the backups, source and diagnostic report. Follow the recovery instructions; do not assume the cartridge is usable until verified. |
 
 When reporting a problem, include application version, OS, reader PCB/firmware,

@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(test)]
 mod tests;
 mod view;
@@ -13,11 +15,20 @@ use std::{path::PathBuf, process::Command, time::Duration};
 
 #[derive(Clone, Debug)]
 enum Modal {
+    #[cfg_attr(all(target_os = "macos", not(test)), allow(dead_code))]
     Files(Browser),
-    Text { title: String, content: String },
-    Hashes { expected: String },
+    Text {
+        title: String,
+        content: String,
+    },
+    Hashes {
+        expected: String,
+    },
     Stop,
-    Save { path: String },
+    #[cfg_attr(all(target_os = "macos", not(test)), allow(dead_code))]
+    Save {
+        path: String,
+    },
 }
 #[derive(Clone, Debug)]
 enum Message {
@@ -57,12 +68,21 @@ enum Message {
     SaveRom,
     SavePath(String),
     SaveCopy,
+    ChooseLibrary,
+    #[cfg(target_os = "macos")]
+    MacMenu(macos::Action),
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingExit {
+    Hide,
+    Quit,
 }
 struct Desktop {
     app: App,
     modal: Option<Modal>,
     size: Size,
     library_path: String,
+    pending_exit: Option<PendingExit>,
 }
 impl Desktop {
     fn new(options: &Options) -> Self {
@@ -82,6 +102,7 @@ impl Desktop {
             modal: None,
             size: options.size,
             library_path,
+            pending_exit: None,
         }
     }
     fn small(&self) -> bool {
@@ -94,12 +115,13 @@ impl Desktop {
     }
     fn update(&mut self, message: Message) -> Task<Message> {
         // A resize hides all controls and dialogs. Hidden controls cannot dispatch actions.
-        if self.small()
-            && !matches!(
-                message,
-                Message::Event(_) | Message::Tick | Message::Stop | Message::ConfirmStop
-            )
-        {
+        let small_allowed = matches!(
+            &message,
+            Message::Event(_) | Message::Tick | Message::Stop | Message::ConfirmStop
+        );
+        #[cfg(target_os = "macos")]
+        let small_allowed = small_allowed || matches!(&message, Message::MacMenu(_));
+        if self.small() && !small_allowed {
             return Task::none();
         }
         if (self.modal.is_some() || self.app.review.is_some())
@@ -117,6 +139,7 @@ impl Desktop {
                     | Message::Artwork(_)
                     | Message::Light(_)
                     | Message::Library(_)
+                    | Message::ChooseLibrary
                     | Message::SaveSettings
                     | Message::FetchArtwork
                     | Message::SaveRom
@@ -130,15 +153,47 @@ impl Desktop {
         match message {
             Message::Tick => {
                 self.app.poll();
+                if !self.app.busy() {
+                    match self.pending_exit.take() {
+                        Some(PendingExit::Quit) => return iced::exit(),
+                        Some(PendingExit::Hide) => {
+                            #[cfg(target_os = "macos")]
+                            macos::hide_application();
+                        }
+                        None => {}
+                    }
+                }
             }
             Message::Event(event) => match event {
-                Event::Window(
-                    window::Event::Opened { size, .. } | window::Event::Resized(size),
-                ) => self.size = size,
+                Event::Window(window::Event::Opened { size, .. }) => {
+                    self.size = size;
+                    // winit creates its default application menu while the event loop
+                    // starts. Install ours only after the native window has opened so
+                    // it cannot be replaced by that initialization.
+                    #[cfg(target_os = "macos")]
+                    if let Err(error) = macos::install_menu() {
+                        self.app.fail(Error::new(
+                            "MACOS_MENU",
+                            format!("The macOS application menu could not be installed: {error}"),
+                            "Restart Cartridge Studio. If this repeats, retain the diagnostic details and report the problem.",
+                        ));
+                    }
+                }
+                Event::Window(window::Event::Resized(size)) => self.size = size,
                 Event::Window(window::Event::CloseRequested) => {
                     if self.app.busy() {
+                        #[cfg(target_os = "macos")]
+                        {
+                            self.pending_exit = Some(PendingExit::Hide);
+                        }
                         self.modal = Some(Modal::Stop);
                     } else {
+                        #[cfg(target_os = "macos")]
+                        {
+                            macos::hide_application();
+                            return Task::none();
+                        }
+                        #[cfg(not(target_os = "macos"))]
                         return iced::exit();
                     }
                 }
@@ -209,6 +264,16 @@ impl Desktop {
             }
             Message::Load => {
                 if !self.app.busy() && self.app.review.is_none() {
+                    #[cfg(all(target_os = "macos", not(test)))]
+                    {
+                        if let Some(path) = macos::choose_rom(&self.app.settings.tui_last_folder) {
+                            self.app.page = Page::Workspace;
+                            let result = self.app.load(&path);
+                            self.handle(result);
+                        }
+                        return Task::none();
+                    }
+                    #[cfg(any(not(target_os = "macos"), test))]
                     match Browser::new(&self.app.settings.tui_last_folder) {
                         Ok(browser) => self.modal = Some(Modal::Files(browser)),
                         Err(e) => self.app.fail(e),
@@ -249,6 +314,7 @@ impl Desktop {
             Message::CloseModal => {
                 self.modal = None;
                 self.app.review = None;
+                self.pending_exit = None;
             }
             Message::Hashes => {
                 self.modal = Some(Modal::Hashes {
@@ -358,15 +424,34 @@ impl Desktop {
             }
             Message::SaveRom => {
                 if let Some(source) = &self.app.source {
-                    self.modal = Some(Modal::Save {
-                        path: self
-                            .app
-                            .settings
-                            .data_directory
-                            .join(source.path.file_name().unwrap_or_default())
-                            .display()
-                            .to_string(),
-                    });
+                    #[cfg(all(target_os = "macos", not(test)))]
+                    {
+                        let file_name = source
+                            .path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .into_owned();
+                        if let Some(path) =
+                            macos::save_rom(&self.app.settings.data_directory, &file_name)
+                        {
+                            let result = self.app.save_rom(&path);
+                            self.handle(result);
+                        }
+                        return Task::none();
+                    }
+                    #[cfg(any(not(target_os = "macos"), test))]
+                    {
+                        self.modal = Some(Modal::Save {
+                            path: self
+                                .app
+                                .settings
+                                .data_directory
+                                .join(source.path.file_name().unwrap_or_default())
+                                .display()
+                                .to_string(),
+                        });
+                    }
                 }
             }
             Message::SavePath(value) => {
@@ -380,11 +465,41 @@ impl Desktop {
                     self.handle(r);
                 }
             }
+            Message::ChooseLibrary => {
+                #[cfg(target_os = "macos")]
+                if let Some(path) = macos::choose_library(&self.app.settings.data_directory) {
+                    self.library_path = path.display().to_string();
+                    return self.update(Message::SaveSettings);
+                }
+            }
+            #[cfg(target_os = "macos")]
+            Message::MacMenu(action) => match action {
+                macos::Action::Open if self.modal.is_none() && self.app.review.is_none() => {
+                    return self.update(Message::Load)
+                }
+                macos::Action::SaveCopy if self.modal.is_none() && self.app.review.is_none() => {
+                    return self.update(Message::SaveRom)
+                }
+                macos::Action::Settings if self.modal.is_none() && self.app.review.is_none() => {
+                    return self.update(Message::Page(Page::Settings))
+                }
+                macos::Action::Help if self.modal.is_none() && self.app.review.is_none() => {
+                    return self.update(Message::Page(Page::Support))
+                }
+                macos::Action::Quit if self.app.busy() => {
+                    self.pending_exit = Some(PendingExit::Quit);
+                    self.modal = Some(Modal::Stop);
+                }
+                macos::Action::Quit => return iced::exit(),
+                _ => {}
+            },
         }
         Task::none()
     }
     fn subscription(&self) -> Subscription<Message> {
         let events = event::listen_with(|event, status, _| presentation_event(event, status));
+        #[cfg(target_os = "macos")]
+        let events = Subscription::batch([events, macos::subscription().map(Message::MacMenu)]);
         if self.app.busy() {
             Subscription::batch([
                 events,

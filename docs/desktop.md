@@ -18,8 +18,10 @@ appearance, clipboard integration and drag-and-drop ROM loading.
    review. Type the exact uppercase confirmation word, or cancel. Mandatory
    backups and verification run in the cartridge service regardless of read options.
 
-**Load ROM** and Ctrl+O open the built-in file browser. Paste a full path, navigate
-folders, or drop a ROM on the window. **Save a copy** checks that the loaded ROM
+**Load ROM** and Ctrl+O open the built-in file browser on Linux. On macOS,
+Command+O and **Open…** use the native open panel with GB/GBC/GBA/NES filters;
+**Save a Copy…** uses the native save panel. Drop a ROM on the window on either
+platform. **Save a copy** checks that the loaded ROM
 has not changed and saves to a new filename. **Backup history** opens retained
 reports and ROMs. **Activity** provides copy/export of diagnostic text.
 
@@ -34,10 +36,22 @@ Stop control available. Returning to a suitable size restores the workspace and
 pending dialog. Within a supported window, the content scrolls and operation
 controls remain at the bottom. Keep USB connected while stopping.
 
-The portable installer and Arch package include the application libraries. No
+The portable Linux installer, Arch package and macOS app include the application
+components. No
 Python, GTK, browser engine, libusb installation or runtime compiler is required.
-The host still provides Linux, glibc and its graphical session. The current build
-is qualified on Arch/Omarchy x86-64. macOS and Windows releases are planned.
+The Linux host still provides glibc and its graphical session. The macOS arm64
+candidate uses system frameworks and requires macOS 13.0 or newer. Windows,
+Intel Mac and Universal releases remain planned.
+
+On macOS the native application menu provides About, Settings, Services, Hide,
+Quit, File, Edit, Window and Help conventions. Closing the last window hides the
+running app; activating its Dock icon reopens it. Quitting or closing during an
+operation first requests cooperative cancellation and retains the operation
+folder. Standard text controls use macOS focus, clipboard and Command-key editing.
+Tab and Shift+Tab route focus through enabled Iced controls. Native menus and
+dialogs expose normal macOS accessibility elements, but Iced 0.14 does not expose
+the Rust-rendered workspace widgets as a semantic VoiceOver tree; screen-reader
+operation of the main workspace is therefore not qualified in this candidate.
 
 Development builds use `python3 scripts/build_desktop.py`. Install the resulting
 version with `python3 scripts/install_desktop.py`, then select GUI and any other

@@ -1,7 +1,7 @@
 # Third-party components
 
-Cartridge Studio contains Rust application binaries and bundled Linux desktop
-integration libraries. Original project code is under the [MIT license](https://github.com/borjaburgos/cartridge-studio/blob/main/LICENSE);
+Cartridge Studio contains Rust application binaries, bundled Linux desktop
+integration libraries and macOS system-framework integrations. Original project code is under the [MIT license](https://github.com/borjaburgos/cartridge-studio/blob/main/LICENSE);
 that license does not replace the separate terms for the components below.
 The public beta contains no Python, PyGObject, GTK, Libadwaita, Textual, Rich
 or PyInstaller runtime. Earlier development interfaces are retained only in a
@@ -12,10 +12,12 @@ Rust dependency versions are pinned in `Cargo.lock`. Build output includes
 `licenses/rust/rust-components.json` and upstream license files. The manifest
 explicitly includes workspace development and target-specific dependencies as
 well as production dependencies, recording each component's source and notice
-status. The Linux release gate requires complete notices for its production/build
-dependency graph. Some other-target/development entries remain declaration-only;
-this is not a claim that macOS or Windows distribution notices are complete.
-Those release targets must pass their own notice gate before shipping. Major
+status. Each release gate requires complete notices for its target production/build
+dependency graph. The macOS arm64 graph passes that gate; reviewed Apple crates
+whose archives contain only an SPDX declaration retain that declaration plus the
+canonical MIT text from a pinned SPDX license-list-data revision. Some
+other-target/development entries remain declaration-only and are not part of the
+macOS or Linux release graph. Windows must pass its own gate before shipping. Major
 components include:
 
 - Iced / winit / tiny-skia / cosmic-text: Rust desktop windowing, rendering and text.

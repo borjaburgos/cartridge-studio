@@ -18,6 +18,8 @@ for proposals. Hardware availability and reproducible evidence determine sequenc
 - Two-pass preservation, checksums, compatibility checks and recovery reports.
 - Exact offline game catalog with optional cached artwork.
 - Linux portable and Arch packages with selectable GUI/TUI/CLI components.
+- Apple Silicon macOS 0.1.0-beta.2 release candidate with DMG and selectable PKG;
+  Developer ID signing/notarization and physical Mac hardware qualification remain.
 
 [Support](support.md) distinguishes implemented paths from physically qualified
 reader/firmware/cartridge combinations. In particular, native Rust write/wipe,
@@ -31,7 +33,7 @@ INLretro GBA and NROM need further hardware qualification.
 | [CS-02](https://github.com/borjaburgos/cartridge-studio/issues/2) | Play from cartridge through your emulator | Next | Users select an executable and arguments per platform, read and verify the inserted cartridge, then launch that retained ROM. GUI/TUI/CLI show setup and launch errors. Partial reads never launch. |
 | [CS-03](https://github.com/borjaburgos/cartridge-studio/issues/3) | Saved-game backup and restore | Next | Save technology and size are identified separately from ROM; two matching backups and recoverable, verified restores work on explicitly qualified boards/readers. Existing saves are backed up before replacement. |
 | [CS-04](https://github.com/borjaburgos/cartridge-studio/issues/4) | Original / reproduction assessment | Planned research | Reports show observed board/chip evidence, catalog identity and explicit confidence/unknown states. A ROM hash alone never labels a cartridge original or counterfeit. No destructive probing is used. |
-| [CS-05](https://github.com/borjaburgos/cartridge-studio/issues/5) | Native macOS GUI, TUI and CLI | Planned | Apple Silicon and Intel targets have native windows, platform conventions, reader access, signed/notarized installers, component selection, update behavior and physical hardware qualification. |
+| [CS-05](https://github.com/borjaburgos/cartridge-studio/issues/5) | Native macOS GUI, TUI and CLI | Apple Silicon candidate | Apple Silicon and Intel targets have native windows, platform conventions, reader access, signed/notarized installers, component selection, update behavior and physical hardware qualification. Apple Silicon packaging is implemented; Intel/Universal, credentials and physical qualification remain. |
 | [CS-06](https://github.com/borjaburgos/cartridge-studio/issues/6) | Native Windows GUI, TUI and CLI | Planned | Windows transport/process/filesystem work is complete, reader drivers have clear setup, packages are signed, and native windows, keyboard/accessibility behavior and hardware are qualified. |
 | [CS-07](https://github.com/borjaburgos/cartridge-studio/issues/7) | Self-contained releases | Ongoing | Each supported OS has reproducible packages, verified checksums, dependency/license inventories and no separately installed application runtime. Host OS requirements are clearly stated and tested. |
 | [CS-08](https://github.com/borjaburgos/cartridge-studio/issues/8) | Every INLretro physical slot | Planned | Expand the current NES, Famicom and shared GB/GBA connector support to SNES / Super Famicom, Nintendo 64 and Mega Drive / Genesis. Add read/verify first, with electrical/mapper checks and physical qualification per slot. Writing only follows exact flash-board support. |

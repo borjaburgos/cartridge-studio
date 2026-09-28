@@ -1,0 +1,5 @@
+# The website must only advance after matching public assets have been verified.
+# Platform releases may intentionally use different source prereleases.
+[linux]
+version = "0.1.0-beta.1"
+architecture = "x86_64"

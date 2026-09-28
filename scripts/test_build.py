@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import build_desktop
 import build_rust
+import setup_llvm
 from build_arch import arch_version, build_arch
 
 
@@ -31,6 +32,18 @@ class ReleaseVersionTests(unittest.TestCase):
         beta = arch_version('0.1.0-beta.1')
         for later in (arch_version('0.1.0-beta.2'), arch_version('0.1.0')):
             self.assertEqual(subprocess.check_output(['vercmp', beta, later], text=True).strip(), '-1')
+
+
+class HelperToolchainTests(unittest.TestCase):
+    def test_qualified_macos_arm64_asset_is_pinned(self):
+        archive, url, digest = setup_llvm.release_asset('Darwin', 'arm64')
+        self.assertEqual(archive, 'LLVM-22.1.8-macOS-ARM64.tar.xz')
+        self.assertTrue(url.endswith('/' + archive))
+        self.assertEqual(digest, 'f260f4f7c0d430828a81ae8a3826a1d63fc0963ec2459489308cc23b1f7eab4f')
+
+    def test_unqualified_helper_host_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, 'No qualified LLVM 22.1.8'):
+            setup_llvm.release_asset('Darwin', 'x86_64')
 
 
 class ReleasePreflightTests(unittest.TestCase):
@@ -147,12 +160,14 @@ class ReleasePrivacyTests(unittest.TestCase):
 
             def fake_makepkg(command, *, cwd, env, check):
                 stages.append(cwd)
-                self.assertEqual(cwd.parent, Path('/tmp'))
+                self.assertEqual(cwd.parent.resolve(), Path('/tmp').resolve())
                 self.assertEqual(env['BUILDDIR'], str(cwd))
                 self.assertEqual(env['PKGDEST'], str(cwd))
                 self.assertEqual(env['PACKAGER'], 'Unknown Packager')
                 self.assertNotIn(str(bundle), (cwd/'PKGBUILD').read_text())
-                self.assertEqual((cwd/'bundle').resolve(), bundle)
+                # macOS reports the same temporary volume as both /var and
+                # /private/var; compare canonical paths rather than spellings.
+                self.assertEqual((cwd/'bundle').resolve(), bundle.resolve())
                 for suffix in ('', '-core', '-gui', '-tui', '-cli'):
                     (cwd/f'cartridge-studio{suffix}-1.2.3-1-x86_64.pkg.tar.zst').write_bytes(b'package')
 

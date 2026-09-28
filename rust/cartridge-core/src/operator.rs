@@ -26,6 +26,18 @@ fn io_error(e: impl std::fmt::Display) -> Error {
     .details(json!({"reason":e.to_string()}))
     .exit(3)
 }
+#[cfg(target_os = "linux")]
+fn permission_action() -> &'static str {
+    "Install Cartridge Studio's exact GB Operator udev rule, reload udev rules, reconnect the reader, then retry."
+}
+#[cfg(target_os = "macos")]
+fn permission_action() -> &'static str {
+    "Close Playback and other cartridge applications, reconnect the GB Operator directly with a data-capable cable, then retry."
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn permission_action() -> &'static str {
+    "Close other cartridge applications, reconnect the GB Operator directly with a data-capable cable, then retry."
+}
 
 fn transfer_error(e: TransferError) -> Error {
     let (code, message, action) = match e {
@@ -114,7 +126,7 @@ impl UsbWire {
                 Error::new(
                     "USB_PERMISSION_DENIED",
                     "The GB Operator cannot be opened with this account.",
-                    "Install Cartridge Studio's exact GB Operator udev rule, reload udev rules, reconnect the reader, then retry.",
+                    permission_action(),
                 )
                 .exit(3)
             } else {

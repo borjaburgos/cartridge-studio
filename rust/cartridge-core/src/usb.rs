@@ -35,6 +35,18 @@ fn transfer_error(e: TransferError) -> Error {
         .details(json!({"reason":e.to_string()}))
         .exit(3)
 }
+#[cfg(target_os = "linux")]
+fn permission_action() -> &'static str {
+    "Install the included 70-cartridge-studio.rules file in /etc/udev/rules.d, reload udev rules and reconnect. With the optional CLI, run sudo cartridge usb-setup."
+}
+#[cfg(target_os = "macos")]
+fn permission_action() -> &'static str {
+    "Close other cartridge applications, reconnect the reader directly with a data-capable cable, and retry. If access is still denied, reconnect it after signing out of the other application."
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn permission_action() -> &'static str {
+    "Close other cartridge applications, reconnect the reader directly with a data-capable cable, and retry."
+}
 impl Usb {
     pub fn open() -> Result<Self> {
         let mut matched = Vec::new();
@@ -97,7 +109,13 @@ impl Usb {
             matched.push((dev,json!({"product":product,"manufacturer":manufacturer,"firmware_usb":format!("{:04x}",info.device_version()),"bus":bus.parse::<u64>().map(Value::from).unwrap_or(json!(bus)),"address":address,"path":path}),bus,address));
         }
         if matched.is_empty() && !denied.is_empty() {
-            return Err(Error::new("USB_PERMISSION_DENIED","The reader cannot be opened with this account.","On Linux, install the included 70-cartridge-studio.rules file in /etc/udev/rules.d, reload udev rules and reconnect. With the optional CLI, run sudo cartridge usb-setup. On macOS, close other cartridge applications and reconnect it.").details(json!({"devices":denied})).exit(3));
+            return Err(Error::new(
+                "USB_PERMISSION_DENIED",
+                "The reader cannot be opened with this account.",
+                permission_action(),
+            )
+            .details(json!({"devices":denied}))
+            .exit(3));
         }
         if matched.len() != 1 {
             return Err(Error::new("READER_COUNT",format!("Expected one INLretro reader; found {}.",matched.len()),"Connect one INLretro in normal mode with a data-capable USB cable. Disconnect additional readers. Do not hold BL.").exit(3));

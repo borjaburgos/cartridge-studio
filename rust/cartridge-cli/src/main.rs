@@ -55,7 +55,7 @@ enum Commands {
     Famicom(Cartridge),
     /// NES cartridges in the separate 72-pin slot.
     Nes(Cartridge),
-    /// Install permanent Linux USB access for INLretro and GB Operator; administrator access required.
+    /// Configure permanent USB access where the operating system requires it.
     UsbSetup {
         #[arg(long)]
         check: bool,
@@ -218,6 +218,41 @@ SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTR{idVendor}==\"16d0\", ATTR
         json!({"message":format!("Installed {}; access for the active desktop account; applied to {count} reader(s).",path.display())}),
     )
 }
+#[cfg(target_os = "linux")]
+fn serial_access_setup_action() -> &'static str {
+    "Add your account to the serial-device group used by your distribution, sign in again, and reconnect. usb-setup only installs narrowly matched INLretro and GB Operator USB rules; it does not grant generic serial-device access."
+}
+
+fn tui_binary() -> Result<PathBuf> {
+    let sibling = std::env::current_exe()?.with_file_name("cartridge-tui");
+    if sibling.is_file() {
+        return Ok(sibling);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let installed = PathBuf::from("/usr/local/bin/cartridge-tui");
+        if installed.is_file() {
+            return Ok(installed);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    let action = "Rerun Cartridge Studio.pkg and include TUI in your component selection.";
+    #[cfg(not(target_os = "macos"))]
+    let action = "Rerun the installer and include TUI in your selection, or install the matching cartridge-studio TUI package for your distribution.";
+    Err(Error::new(
+        "TUI_NOT_INSTALLED",
+        "The terminal interface is not installed.",
+        action,
+    ))
+}
+#[cfg(target_os = "macos")]
+fn serial_access_setup_action() -> &'static str {
+    "macOS does not use Linux serial-device groups or udev rules. Close FlashGBX and other cartridge applications, reconnect GBxCart directly, and choose its /dev/cu.usbserial port."
+}
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn serial_access_setup_action() -> &'static str {
+    "Use the operating system's serial-device access controls, reconnect GBxCart, and choose its current serial port."
+}
 fn show(v: &Value, structured: bool) {
     if structured {
         println!("{}", serde_json::to_string_pretty(v).unwrap());
@@ -288,16 +323,17 @@ fn execute(cli: Cli, cancel: Cancel) -> Result<()> {
         }
         Commands::UsbSetup { check } => {
             if r.reader == Kind::Gbxcart || r.port.is_some() {
-                return Err(Error::new("SERIAL_ACCESS_SETUP", "GBxCart uses your operating system’s serial-device access permissions.", "On Arch, add your account to uucp and sign in again; on distributions using dialout, use that group instead. usb-setup installs narrowly matched INLretro and GB Operator USB rules. A generic CH340 rule would also grant access to unrelated serial devices."));
+                return Err(Error::new(
+                    "SERIAL_ACCESS_SETUP",
+                    "GBxCart uses your operating system’s serial-device access permissions.",
+                    serial_access_setup_action(),
+                ));
             }
             show(&usb_setup(check)?, cli.json);
             return Ok(());
         }
         Commands::Tui { args } => {
-            let path = std::env::current_exe()?.with_file_name("cartridge-tui");
-            if !path.is_file() {
-                return Err(Error::new("TUI_NOT_INSTALLED", "The terminal interface is not installed.", "Rerun the installer and include TUI in your selection, or install the cartridge-studio-tui Arch package."));
-            }
+            let path = tui_binary()?;
             let mut command = Command::new(path);
             if let Some(root) = r.data_directory {
                 command.arg("--library").arg(root);

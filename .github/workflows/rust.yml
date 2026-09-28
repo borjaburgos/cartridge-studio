@@ -57,3 +57,47 @@ jobs:
           python3 -m venv tmp/arm-tests
           tmp/arm-tests/bin/pip install unicorn==2.1.4
           tmp/arm-tests/bin/python scripts/test_inlretro_flash.py
+
+  macos-arm64:
+    runs-on: macos-15
+    env:
+      CARGO_HOME: ${{ github.workspace }}/tmp/toolchains/cargo
+      RUSTUP_TOOLCHAIN: 1.88.0
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check macOS packaging logic and notice provenance
+        run: |
+          python3 scripts/test_build.py
+          python3 scripts/test_rust_notices.py
+      - name: Install Rust development toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --component rustfmt,clippy
+      - uses: actions/cache@v4
+        id: llvm
+        with:
+          path: tmp/toolchains/llvm
+          key: llvm-22.1.8-macos-arm64-f260f4f7
+      - name: Prepare qualified Apple Silicon helper compiler
+        run: |
+          python3 scripts/setup_llvm.py
+          echo "$PWD/tmp/toolchains/llvm/bin" >> "$GITHUB_PATH"
+      - name: Prepare pinned build assets
+        run: |
+          python3 scripts/build_game_catalog.py
+          python3 scripts/build_helper.py
+          cargo fetch --locked
+      - name: Check formatting and strict macOS lint
+        run: |
+          cargo fmt --all --check
+          cargo clippy --locked --offline --workspace --all-targets -- -D warnings
+      - name: Test the shared engine and macOS interfaces without hardware
+        run: cargo test --locked --offline --workspace
+      - name: Build and validate unsigned macOS packages
+        run: |
+          python3 scripts/build_macos.py
+          python3 scripts/test_macos_package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cartridge-studio-${{ github.sha }}-macos-arm64-unsigned
+          path: tmp/dist-macos/
+          if-no-files-found: error

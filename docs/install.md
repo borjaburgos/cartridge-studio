@@ -1,10 +1,44 @@
 # Install Cartridge Studio
 
-The first public beta, **0.1.0-beta.1**, ships for **Linux x86-64**, qualified
-on Arch Linux / Omarchy. This is a testing release with limited hardware coverage;
-check [supported configurations](support.md) before using a cartridge.
-macOS and Windows packages are planned and are not available yet. Obtain release
-files from [GitHub Releases](https://github.com/borjaburgos/cartridge-studio/releases).
+The published **0.1.0-beta.1** remains the Linux x86-64 release. The
+**0.1.0-beta.2 release candidate** adds Apple Silicon macOS 13.0 or newer.
+Both are testing builds with limited hardware coverage; check
+[supported configurations](support.md) before using a cartridge. Windows and
+Intel/Universal Mac packages are not available. Obtain candidate files and their
+`SHA256SUMS` together from [GitHub Releases](https://github.com/borjaburgos/cartridge-studio/releases).
+
+## macOS Apple Silicon candidate
+
+Verify the downloaded DMG or PKG against `SHA256SUMS` with `shasum -a 256`.
+For the graphical app, open the DMG and drag **Cartridge Studio.app** to
+Applications. For component selection, open the PKG, choose **Customize**, and
+select GUI, TUI, CLI or any combination. The terminal choices install predictable
+commands at `/usr/local/bin/cartridge-tui` and `/usr/local/bin/cartridge`; the
+shared worker is kept under `/usr/local/libexec/cartridge-studio`.
+
+Open the app from Finder or Launchpad. Installed terminal components run with:
+
+```sh
+cartridge-tui --no-device
+cartridge --help
+cartridge doctor
+```
+
+Re-run the same-version or newer PKG to add or remove managed components. The
+installer removes only components marked as managed by Cartridge Studio and then
+installs the current selection. It never removes `~/Library/Application Support/Cartridge Studio`,
+the legacy `~/Library/Application Support/INL` library, or a custom library.
+
+The local 0.1.0-beta.2 candidate is ad-hoc signed because Developer ID and
+notarization credentials were unavailable. It is not notarized or stapled, and
+Gatekeeper acceptance is not claimed. Do not disable Gatekeeper or weaken system
+security. A distribution intended for general installation still requires
+Developer ID Application/Installer signing, notarization and stapling.
+
+macOS does not use Linux udev rules or serial-device groups. Close Playback,
+FlashGBX and other cartridge applications, connect the reader directly with a
+data-capable cable, and select the current `/dev/cu.usbserial…` port for GBxCart
+when using the CLI. The installed app needs no Homebrew packages or development tools.
 
 ## Portable Linux archive
 
@@ -106,6 +140,11 @@ GUI and TUI share `studio/settings.json`, their library and reports. A custom
 library can be selected with `--library` or `CARTRIDGE_STUDIO_DATA_DIR`.
 `INL_DATA_DIR` is retained only as a legacy override. Changing a library location
 does not move earlier backups automatically.
+
+On macOS the default library is `~/Library/Application Support/Cartridge Studio`.
+If that location does not yet exist and `~/Library/Application Support/INL` does,
+the existing library remains in place and is reused so saved reports and backups
+keep their original recovery paths.
 
 For users of private development builds, the app was formerly called INL
 Cartridge Studio; managed legacy launchers are replaced during installation.
