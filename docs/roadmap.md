@@ -40,6 +40,34 @@ INLretro GBA and NROM need further hardware qualification.
 | [CS-11](https://github.com/borjaburgos/cartridge-studio/issues/11) | RTC preservation | Planned; depends on CS-03 | Preserve raw clock state, timestamp and format alongside save backups; restoration is explicit and verified. Host-time emulation cannot silently rewrite the cartridge clock. |
 | [CS-12](https://github.com/borjaburgos/cartridge-studio/issues/12) | Collection and accessibility | Planned | Local search/filtering, readable progress/recovery, accessible navigation and predictable layouts work across frontends. Metadata sources have clear licenses and identity remains exact. |
 | [CS-13](https://github.com/borjaburgos/cartridge-studio/issues/13) | Stable automation contract | Planned | Document and version CLI JSON results/errors, exit behavior and cancellation; add integration fixtures. Promote a library or optional local API only for a demonstrated integration. |
+| [CS-14](https://github.com/borjaburgos/cartridge-studio/issues/14) | YOLO mode: fast, unverified transfers | Planned | Explicit GUI/TUI/CLI mode performs single-pass reads and direct writes/wipes without optional identification/compatibility checks, automatic backups, source hash pinning, checksums, blank checks or readbacks. Results are labeled unverified; per-reader timing and unavoidable firmware behavior are documented. |
+
+## YOLO mode
+
+Tracked in [CS-14](https://github.com/borjaburgos/cartridge-studio/issues/14).
+
+An explicit fast mode for users who want to read, write or wipe immediately,
+without Cartridge Studio's optional verification and compatibility checks.
+Reads use one pass; writes skip automatic backups, repeated physical
+identification, source hash pinning, blank verification, per-bank readbacks and
+final readbacks. Bad ROM checksums do not block the operation. Users can supply
+the supported board profile and transfer size when automatic selection would
+require extra checks. Metadata and artwork lookup stay off the transfer path.
+
+Verified mode remains the default. GUI and TUI expose the same explicit choice
+as a proposed CLI `--yolo` flag, with **YOLO — unverified** shown during the
+operation and in the retained result. Selecting the mode should not introduce
+repeated confirmation dialogs. Transfer completion never implies verified bytes
+or a playable game.
+
+Required command framing, profile voltage/timing, acknowledgements and error
+handling still apply. YOLO does not supply a missing programming algorithm or
+suppress disconnects, partial transfers, file errors or firmware rejections.
+Some readers enforce checks internally; document these limits rather than
+claiming firmware verification was disabled. Shared Rust policy, protocol-trace
+tests and physical timing measurements must demonstrate the skipped work across
+all frontends. The current verification-only transaction requirements need an
+explicit exception when this planned mode is implemented.
 
 ## Play means a verified local copy
 
