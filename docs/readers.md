@@ -95,6 +95,13 @@ complete hash matches; unknown games use the shared mirroring/full-window sizing
 path. Each backup pass is a separate complete device stream. Save commands and
 cartridge programming commands are absent from this driver.
 
+The GB reader accepts the `0x20`, `0x21` and `0x22` cartridge-kind records;
+previous builds incorrectly rejected Color variants such as the `0x22` record
+returned by the Ferrante test cartridge. Unknown kinds still stop before a ROM
+read. Reports retain the observed kind, record and firmware version when present.
+See [Operator programming investigation](operator-programming.md) for the
+remaining programming limitations and the qualification plan.
+
 ## Writing and wiping a Ferrante 512
 
 Select **Game Boy / Color**, **GBxCart RW**, and the board profile

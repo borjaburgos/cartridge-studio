@@ -285,6 +285,8 @@ pub fn gb_read_with(
         }
         Ok(())
     })();
+    // Initialization can discover firmware and cartridge transport details.
+    j.report["device"] = r.identity();
     let close = r.close();
     drop(r);
     j.finish(cleanup(result, close))

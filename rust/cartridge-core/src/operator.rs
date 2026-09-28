@@ -297,7 +297,9 @@ impl Reader {
                 record: first.to_vec(),
             });
         }
-        if first[2] != 0x20 {
+        // The low nibble distinguishes GB / Color variants. Restrict the
+        // accepted values; an unfamiliar family must not fall through to GB.
+        if ![0x20, 0x21, 0x22].contains(&first[2]) {
             return Err(Error::new(
                 "OPERATOR_CARTRIDGE_INFO_INVALID",
                 "The GB Operator returned an unknown cartridge information format.",
@@ -305,6 +307,12 @@ impl Reader {
             )
             .details(json!({"cartridge_info":hex::encode(&first[..PAYLOAD])})));
         }
+        if first[0] >= 9 && first[26] != 0 {
+            self.identity["firmware_version"] =
+                json!(format!("{}.{}.{}", first[26], first[27], first[28]));
+        }
+        self.identity["operator_cartridge_kind"] = json!(first[2]);
+        self.identity["operator_cartridge_record"] = json!(hex::encode(first));
         let rom_bytes = u32::from_le_bytes([first[5], first[6], first[7], 0]) as usize;
         let ram_bytes = u32::from_le_bytes([first[9], first[10], first[11], 0]) as usize;
         if !(32 * 1024..=8 * 1024 * 1024).contains(&rom_bytes)
@@ -502,6 +510,7 @@ mod tests {
         waiting_for_ack: bool,
         commands: Vec<u8>,
         gba: bool,
+        gb_kind: Option<u8>,
     }
     struct Fake(Rc<RefCell<State>>);
     fn checked_frame(mut payload: [u8; FRAME]) -> [u8; FRAME] {
@@ -539,7 +548,13 @@ mod tests {
                     s.queued.push_back(vec![0; PAYLOAD]);
                     s.queued.push_back(vec![0; FRAME - PAYLOAD]);
                     let mut info = [0; FRAME];
-                    info[2] = if s.gba { 0x30 } else { 0x20 };
+                    info[0] = 9;
+                    info[26..29].copy_from_slice(&[9, 5, 0]);
+                    info[2] = if s.gba {
+                        0x30
+                    } else {
+                        s.gb_kind.unwrap_or(0x20)
+                    };
                     info[3] = 1;
                     if s.gba {
                         info[13..18].copy_from_slice(b"TTST0");
@@ -621,6 +636,56 @@ mod tests {
         assert_eq!(reader.header_bytes().unwrap(), rom[..0x150]);
         assert_eq!(reader.read_bank(31).unwrap(), rom[31 * 16384..]);
         assert_eq!(state.borrow().commands, [4, 0]);
+    }
+
+    #[test]
+    fn color_cartridge_records_read_without_programming_commands() {
+        for kind in [0x21, 0x22] {
+            let rom = vec![0x5a; 32 * 1024];
+            let state = Rc::new(RefCell::new(State {
+                rom: rom.clone(),
+                gb_kind: Some(kind),
+                ..Default::default()
+            }));
+            let mut reader =
+                Reader::connect(Box::new(Fake(state.clone())), Cancel::default()).unwrap();
+            gb::RomReader::initialize(&mut reader).unwrap();
+            reader.set_mapper("ROM".into());
+            assert_eq!(reader.read_bank(1).unwrap(), rom[16384..]);
+            assert_eq!(reader.identity["operator_cartridge_kind"], kind);
+            assert_eq!(reader.identity["firmware_version"], "9.5.0");
+            assert_eq!(state.borrow().commands, [4, 0]);
+        }
+    }
+
+    #[test]
+    fn repeated_initialization_fetches_fresh_bytes_instead_of_reusing_cache() {
+        let state = Rc::new(RefCell::new(State {
+            rom: vec![0x5a; 32 * 1024],
+            gb_kind: Some(0x22),
+            ..Default::default()
+        }));
+        let mut reader = Reader::connect(Box::new(Fake(state.clone())), Cancel::default()).unwrap();
+        reader.set_mapper("ROM".into());
+        gb::RomReader::initialize(&mut reader).unwrap();
+        assert_eq!(reader.read_bank(1).unwrap()[0], 0x5a);
+        state.borrow_mut().rom[16384] = 0xa5;
+        gb::RomReader::initialize(&mut reader).unwrap();
+        assert_eq!(reader.read_bank(1).unwrap()[0], 0xa5);
+        assert_eq!(state.borrow().commands, [4, 0, 4, 0]);
+    }
+
+    #[test]
+    fn unknown_cartridge_kind_stops_before_reading_rom() {
+        let state = Rc::new(RefCell::new(State {
+            rom: vec![0; 32 * 1024],
+            gb_kind: Some(0x23),
+            ..Default::default()
+        }));
+        let mut reader = Reader::connect(Box::new(Fake(state.clone())), Cancel::default()).unwrap();
+        let error = gb::RomReader::initialize(&mut reader).unwrap_err();
+        assert_eq!(error.code, "OPERATOR_CARTRIDGE_INFO_INVALID");
+        assert_eq!(state.borrow().commands, [4]);
     }
 
     #[test]
