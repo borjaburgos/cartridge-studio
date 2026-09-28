@@ -64,6 +64,9 @@ pub fn check(kind: Kind, platform: &str, profile: &str, action: &str) -> Result<
         }
     }
     if kind == Kind::Operator && action != "doctor" {
+        if platform == "gameboy" && ["write", "wipe"].contains(&action) {
+            return Err(crate::operator_programming::unavailable());
+        }
         let read = ["gameboy", "gba"].contains(&platform)
             && profile == "auto"
             && ["probe", "read", "backup", "verify"].contains(&action);

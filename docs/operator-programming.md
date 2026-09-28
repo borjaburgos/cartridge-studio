@@ -1,7 +1,9 @@
 # GB Operator programming investigation
 
-Status: investigation only. ROM writing and wiping remain disabled. The cartridge
-has not been erased or programmed by this investigation.
+Status: the separate Rust transaction policy is implemented and tested with
+injected hardware. The USB programming adapter is not implemented or qualified;
+ROM writing and wiping remain disabled. The cartridge has not been erased or
+programmed by this investigation.
 
 ## Verified locally
 
@@ -54,16 +56,58 @@ for a readback, or upgrade firmware automatically.
 2. Establish the command framing, firmware applicability, identification result,
    erase status, data pacing, completion status and cancellation behavior from
    documented protocol evidence or controlled reference traces.
-3. Determine whether the firmware permits the existing blank and bank checks.
-   If it cannot, agree explicitly on an Operator-specific safety policy before
-   adding a different transaction. Do not silently relax the shared transaction.
-4. Implement the transport and transaction in Rust, with offline fault injection
-   for rejection, unexpected responses, timeout, disconnect and cancellation.
+3. Implement and qualify the USB adapter against the approved transaction below.
+   Do not silently relax the shared transaction for other readers.
+4. Qualify transport framing, replies, timeout and cancellation behavior with
+   reference traces. Transaction fault injection alone does not prove USB behavior.
 5. Qualify on the explicitly authorized cartridge, retaining two full backups,
    pinned source, all available erase evidence and two independent full-capacity
    final readbacks. Report which checks were actually possible.
 6. Enable GUI/TUI/CLI capabilities only for the qualified firmware/profile pair,
    including recovery guidance and a clear explanation for unsupported boards.
+
+## Approved Operator transaction
+
+On 2026-09-27 the user approved firmware-managed combined erase/program, without
+an intermediate host blank check or immediate per-bank readbacks. This exception
+does not enable YOLO mode or permit an unknown physical board.
+
+`cartridge-core::operator_programming::write_with` implements this policy:
+
+1. Validate the reviewed SHA-256 and compatible source; durably retain the source.
+2. Require physical Ferrante 512 / SST39SF040 identification and an adapter that
+   has qualified the firmware protocol. A source header or selected profile is
+   not identification evidence.
+3. Save two fresh, complete 512 KiB backups and require equality.
+4. Recheck physical identity and cancellation before entering a durably recorded
+   combined erase/program stage.
+5. Program a full-capacity target with unused bytes padded to `FF`.
+6. Independently read all 512 KiB twice, comparing both reads to the padded target.
+7. Retain the readbacks and report which checks were performed and unavailable.
+
+The hardware-injected tests cover source changes, unknown/wrong flash, identity
+changes, short reads, mismatched backups, both final-pass failures (including
+unused flash), cancellation, adapter timeout/disconnect/unexpected-reply errors,
+and cleanup failure. They send no USB commands. These tests validate transaction
+ordering and failure retention, not a real firmware implementation.
+
+The shared GUI/TUI model and CLI now explain that programming qualification is
+pending instead of suggesting that selecting Ferrante will enable Operator writes.
+There is no public capability change and no claim of successful hardware writing.
+
+## Protocol research boundary
+
+Static interoperability research on Playback 1.10.0 shows that USB product
+`123d` selects the streaming implementation only for firmware newer than 9.5.0;
+9.5.0 selects the legacy implementation. This distinguishes the connected reader
+from the newer Detect Flashcart command path. No newer command has been sent as
+a speculative detection probe.
+
+Legacy write framing and bank/data pacing have been located, but a reliable
+physical flash-identification result and explicit erase-success/error semantics
+remain unqualified. A controlled reference trace on a confirmed board is the
+next hardware step. Do not treat a response other than an erase-busy marker as
+proof of success, nor use a destructive write command to discover board identity.
 
 ## References
 

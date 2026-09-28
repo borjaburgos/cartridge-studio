@@ -393,6 +393,8 @@ impl App {
             "GBxCart does not support this slot. Choose Game Boy / Color or Game Boy Advance."
         } else if self.effective_reader() == Kind::Operator && self.platform != Platform::GameBoy {
             "GB Operator supports Game Boy / Color and Game Boy Advance ROM reading. Choose one of those cartridge families."
+        } else if self.effective_reader() == Kind::Operator {
+            "Operator write/wipe awaits physical flash identification and programming qualification. Selecting Ferrante cannot enable it yet. Use a qualified GBxCart RW or INLretro profile for writing."
         } else if self.platform == Platform::GameBoy && !self.writable() {
             "Write/wipe: select Ferrante 512 only if it matches your cartridge. Automatic mode is read-only."
         } else if !self.writable() {
@@ -1112,5 +1114,10 @@ mod gba_tests {
         assert!(!app.can("wipe"));
         app.set_platform(Platform::GameBoy).unwrap();
         assert_eq!(app.request("read").gba_rom_bytes, None);
+        assert!(app
+            .write_note()
+            .contains("awaits physical flash identification"));
+        assert!(!app.can("write"));
+        assert!(!app.can("wipe"));
     }
 }

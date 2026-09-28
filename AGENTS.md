@@ -15,6 +15,13 @@ blank verification, per-bank readback or two final readbacks. Unknown physical
 boards stay blocked. Routine tests must not open USB or run historical hardware
 programming qualification scripts.
 
+The user authorized an Operator-specific transaction on 2026-09-27: firmware
+may combine erase and programming, without a host blank check between them or
+immediate bank readbacks. Retain physical board qualification, pinned source,
+two matching full-capacity backups, and two fresh full-capacity final readbacks.
+Report unavailable checks explicitly; transport acknowledgements are not
+verification. This exception does not change other readers or enable YOLO mode.
+
 ## Native Rust architecture
 
 `cartridge-core` owns cartridge logic; `cartridge-worker` executes one isolated request.

@@ -13,6 +13,7 @@ pub mod gbxcart;
 pub mod inl_gba;
 pub mod operations;
 pub mod operator;
+pub mod operator_programming;
 pub mod readers;
 pub mod service;
 pub mod usb;
