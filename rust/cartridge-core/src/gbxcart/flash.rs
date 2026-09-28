@@ -49,11 +49,10 @@ impl Reader {
         self.bank_write(0x2000, 1)?;
         let before = self.read_range(0, 0x150)?;
         let header = rom::gb_header(&before)?;
-        if header["logo_valid"] == true
-            && (header["cartridge_type"] != 0x19 || header["ram_size_code"] != 0)
-        {
-            return Err(Error::new("ROM_INCOMPATIBLE", "The connected cartridge header does not match the Ferrante 512 / AUDIO-MBC5 profile.", "Choose Automatic for reading, or select the exact physical flash board. Nothing has been erased."));
-        }
+        // Existing contents may be a factory test ROM, blank, or interrupted.
+        // They do not identify physical hardware. The exact responding JEDEC ID
+        // and unchanged-header check below remain mandatory; new source ROMs
+        // are independently validated before this transaction opens hardware.
         self.flash_session = true;
         self.configure_audio()?;
         self.reset_flash()?;

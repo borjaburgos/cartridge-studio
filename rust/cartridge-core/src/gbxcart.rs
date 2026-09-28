@@ -894,6 +894,10 @@ mod tests {
         }
         f.borrow_mut().rom.resize(rom::CAPACITY, 0x42);
         f.borrow_mut().fault = fault;
+        if fault == "factory-header" {
+            f.borrow_mut().rom[0x147] = 0x1b;
+            f.borrow_mut().rom[0x149] = 3;
+        }
         let cancel = Cancel::default();
         if fault == "program-cancel" {
             f.borrow_mut().cancel_on_program = Some(cancel.clone());
@@ -992,6 +996,43 @@ mod tests {
             std::fs::read(temp.path().join("operation/after.read2.bin")).unwrap()
         );
     }
+    #[test]
+    fn recovery_retains_factory_header_backup_and_verifies_new_compatible_rom() {
+        let (result, f, temp) = flash_transaction("write", "factory-header");
+        let report = result.unwrap();
+        assert_eq!(report["status"], "complete");
+        assert_eq!(report["blank_verified_bytes"], rom::CAPACITY);
+        assert_eq!(report["identical_final_reads"], true);
+        let before = std::fs::read(temp.path().join("operation/before.read1.bin")).unwrap();
+        assert_eq!(before[0x147], 0x1b);
+        assert_eq!(before[0x149], 3);
+        assert_eq!(f.borrow().rom[0x147], 0x19);
+        assert_eq!(f.borrow().rom[0x149], 0);
+    }
+
+    #[test]
+    fn flash_identification_uses_chip_response_not_existing_rom_header() {
+        for fault in ["", "id"] {
+            let f = Rc::new(RefCell::new(Firmware::default()));
+            f.borrow_mut().rom[0x147] = 0x1b;
+            f.borrow_mut().rom[0x149] = 3;
+            f.borrow_mut().fault = fault;
+            let before = f.borrow().rom.clone();
+            let mut r =
+                Reader::connect(Box::new(Fake(f.clone())), "/dev/test", Cancel::default()).unwrap();
+            let result = r.identify_flash();
+            if fault == "id" {
+                assert_eq!(result.unwrap_err().code, "FLASH_NOT_IDENTIFIED");
+            } else {
+                assert_eq!(result.unwrap()["flash_id"], "bfb7");
+            }
+            r.close().unwrap();
+            assert_eq!(f.borrow().rom, before);
+            assert_eq!(f.borrow().erases, 0);
+            assert_eq!(f.borrow().programs, 0);
+        }
+    }
+
     #[test]
     fn flash_requires_identification_and_qualified_firmware() {
         use crate::gb::FlashWriter;

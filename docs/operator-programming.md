@@ -132,9 +132,24 @@ mostly consistent with programming bits without a complete erase. They did not
 match the requested game. Neither the interrupted image nor the operation is
 reported as successful. The original backups remain intact.
 
-The user has been asked to move the cartridge to GBxCart RW for recovery using
-the already-qualified transaction. The local investigation record tracks the
-recovery outcome; do not claim recovery before two final readbacks pass.
+Recovery succeeded after the user moved the cartridge to GBxCart RW. The reader
+(v1.4 PCB revision 6, firmware L14) electronically identified SST39SF040 `BF B7`.
+The native transaction retained two matching recovery backups, verified all
+524,288 bytes blank after erase, verified the 16 programmed banks, and obtained
+two fresh full-capacity readbacks matching the requested ROM plus blank padding.
+The 262,144-byte release and extracted readback share SHA-256
+`e0077aac4c8d499b5152c0a62b0defeff1e07c3ac44767f8a932bef453cc7553`.
+An independent PyBoy smoke test of that cartridge readback reached Stage 1 and
+exercised movement and firing; this is not a complete playthrough. Original
+backups and recovery reports remain in the ignored local investigation folder.
+
+Recovery exposed an incorrect GBxCart restriction: existing factory-test ROM
+headers were treated as physical board identity. Identification now uses the
+responding flash chip, retaining the exact `BF B7` requirement and unchanged
+header check around identification. New ROM compatibility checks remain intact.
+Tests cover factory-header recovery and rejection of a mismatched chip ID.
+This successful GBxCart recovery does **not** qualify Operator programming;
+Operator write and wipe remain disabled.
 
 Hardware failures are journaled before USB cleanup so a cleanup stall cannot hide
 the error and recovery paths. The USB library's cancellation path can wait beyond
