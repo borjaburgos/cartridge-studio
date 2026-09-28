@@ -1,7 +1,7 @@
 # GB Operator programming investigation
 
-Status: the separate Rust transaction and a provisional legacy USB adapter are
-implemented. A physical firmware 9.5.0 / Ferrante 512 attempt failed erase/program
+Status: native reads are physically verified on firmware 9.5.0 and 10.0.10.
+The separate Rust transaction and a provisional legacy USB writer are implemented. A physical firmware 9.5.0 / Ferrante 512 attempt failed erase/program
 qualification. Production ROM writing and wiping remain disabled, including a
 guard inside the adapter. Synthetic tests do not override this hardware result.
 
@@ -103,8 +103,8 @@ There is no public capability change and no claim of successful hardware writing
 Static interoperability research on Playback 1.10.0 shows that USB product
 `123d` selects the streaming implementation only for firmware newer than 9.5.0;
 9.5.0 selects the legacy implementation. This distinguishes the connected reader
-from the newer Detect Flashcart command path. No newer command has been sent as
-a speculative detection probe.
+from the newer Detect Flashcart command path. After the explicitly authorized firmware upgrade, the newer detection command
+was exercised on 10.0.10, as described below. It was not sent to legacy firmware.
 
 Legacy framing uses command 1, save-chip classification, ROM byte length and
 reported save byte length, followed by the command CRC. The host exchanges a
@@ -189,8 +189,12 @@ The official manifest used by the macOS release was subsequently located at
 that same endpoint, Playback identified this reader as board revision 1 and
 offered a device update. Only the metadata request was redirected: no firmware,
 checksum, download authentication, or update execution was replaced. The update
-has not been started and requires the user's explicit approval. A direct firmware
-download requires vendor authorization; use Playback's authenticated update flow.
+was explicitly authorized by the user and completed through Playback's
+own authenticated download/decryption and updater. The application firmware is
+now 10.0.10, confirmed by both a fresh Playback process and the device's cartridge
+information record. Core firmware remains 2.0.0. The vendor updater logged a USB
+PIPE response during DFU manifestation, then confirmed successful reconnection;
+the actual runtime version establishes the update result.
 
 The reference failure is covered by a transport regression test: a command ACK
 split into 60 + 4 bytes, without an erase-ready response, must fail at the erase
@@ -205,3 +209,44 @@ stage without sending a bank handshake or any ROM data.
 
 The references are protocol research, not bundled runtime dependencies. No
 Playback source code or binaries are included in Cartridge Studio.
+
+## Firmware 10.0.10 investigation
+
+The native Rust reader now negotiates the streaming protocol from the information
+command's ready packet. Commands retain the 64-byte CRC framing; status and
+information records are 512 bytes. A status record starts `C0 DE`, state, opcode,
+complemented opcode, followed by zero padding. Ready is state 0 and done is state
+1. ROM data streams without legacy zero acknowledgements. The host requires the
+correct completion packet before accepting a read. ROM and save sizes in the new
+information record are byte-sized powers-of-two exponents at offsets 5 and 6;
+these fields must not be parsed as the legacy byte counts. Only firmware 10.0.10
+is currently accepted for this new record format.
+
+An independent read-only protocol probe and the native Rust reader each retained
+two complete 512 KiB reads after the firmware update. Both match the previously recovered v0.7.2 image and its blank padding,
+SHA-256 `8b5657a47b8dad33416d38b9a97755a8cc5aded9d86dd253464bf1370fc82c4c`.
+This confirms the cartridge remained intact through the update and qualifies
+native GB reads on this reader. GBA streaming has injected protocol tests, but
+has not been physically requalified on 10.0.10. USB burst-ending zero-length
+packets are skipped with a bounded retry count. An interrupted transaction
+produced an invalid completion record and was correctly rejected; after the
+idle USB connection was reset, both native reads completed and matched.
+
+Both Playback and the independent command `0x15` probe currently report cartridge
+kind `0x20`, no flash capacity and no writable classification. Playback disables
+Upload Homebrew. This is not an electronic identification of a writable Ferrante;
+it does not justify sending a write command or claiming the new firmware fixed
+programming. A cold-power-on/reseat check is pending. Production writing and
+wiping remain disabled.
+
+The explicit development example `operator_read_qualification` performs native
+flash detection and two fresh reads of the caller-confirmed 512 KiB capacity.
+It never sends erase/program commands. Ordinary automated tests inject protocol
+records and do not open hardware. New regressions cover fragmented transfers,
+legacy/new protocol separation, fresh repeated reads, exponent validation,
+unsupported firmware, corrupt status records and missing completion packets.
+
+The packaged native CLI also completed its ordinary verified GB read on 10.0.10:
+two 256 KiB game reads matched the release and passed header/global checksums.
+The local GUI/TUI/CLI installation was updated with this reader support after
+packaging and installer checks. No Operator write capability was enabled.

@@ -1,6 +1,7 @@
 //! Native Epilogue GB Operator ROM transport.
 //!
-//! The reader uses 64-byte frames on its CDC data interface. The provisional
+//! Commands use 64-byte frames on the CDC data interface; firmware 10.0.10
+//! adds 512-byte status records and continuous ROM reads. The provisional
 //! ROM writer failed physical qualification and remains gated off outside
 //! injected tests. Save-memory commands are not implemented.
 use crate::{gb, gba, storage::Cancel, Error, Result};
@@ -15,6 +16,7 @@ const VID: u16 = 0x16d0;
 const PID: u16 = 0x123d;
 const FRAME: usize = 64;
 const PAYLOAD: usize = 60;
+const STREAM_FRAME: usize = 512;
 const ACK_INTERVAL: usize = 320;
 // The real 9.5.0/Ferrante attempt failed erase/program qualification.
 // Only injected tests may exercise the provisional transport until requalified.
@@ -174,13 +176,19 @@ impl Wire for UsbWire {
             .rx
             .as_mut()
             .ok_or_else(|| io_error("USB interface is closed"))?;
-        let completion = rx.transfer_blocking(Buffer::new(FRAME), Duration::from_secs(3));
-        completion.status.map_err(transfer_error)?;
-        if completion.actual_len == 0 {
-            return Err(io_error("the reader returned an empty USB transfer"));
+        // Streaming firmware terminates some USB bursts with a zero-length
+        // packet. It is transport framing, not an empty cartridge record.
+        // Bound retries so a device emitting only ZLPs cannot spin forever.
+        for _ in 0..16 {
+            let completion = rx.transfer_blocking(Buffer::new(FRAME), Duration::from_secs(3));
+            completion.status.map_err(transfer_error)?;
+            if completion.actual_len != 0 {
+                return Ok(completion.buffer[..completion.actual_len].to_vec());
+            }
         }
-        Ok(completion.buffer[..completion.actual_len].to_vec())
+        Err(io_error("the reader returned only empty USB transfers"))
     }
+
     fn close(&mut self) -> Result<()> {
         self.tx.take();
         self.rx.take();
@@ -224,6 +232,16 @@ fn command(payload: &[u8]) -> Result<[u8; FRAME]> {
     Ok(frame)
 }
 
+fn validate_stream_status(reply: &[u8], opcode: u8, state: u8) -> Result<()> {
+    if reply.len() != STREAM_FRAME
+        || reply[..5] != [0xc0, 0xde, state, opcode, !opcode]
+        || reply[5..].iter().any(|&b| b != 0)
+    {
+        return Err(unexpected_reply("stream_status", reply));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug)]
 enum CartridgeInfo {
     GameBoy { rom_bytes: usize, ram_bytes: usize },
@@ -238,6 +256,7 @@ pub struct Reader {
     rom: Vec<u8>,
     mapper: Option<String>,
     closed: bool,
+    streaming_protocol: bool,
 }
 
 impl Reader {
@@ -254,6 +273,7 @@ impl Reader {
             rom: vec![],
             mapper: None,
             closed: false,
+            streaming_protocol: false,
         })
     }
     fn read_exact(&mut self, length: usize) -> Result<Vec<u8>> {
@@ -283,11 +303,44 @@ impl Reader {
             error
         })
     }
+    fn stream_status(&mut self, opcode: u8, state: u8) -> Result<()> {
+        let reply = self.read_exact(STREAM_FRAME)?;
+        validate_stream_status(&reply, opcode, state)
+    }
     fn cartridge_info(&mut self) -> Result<CartridgeInfo> {
         let request = command(&[0x04])?;
-        let _ack = Self::stage(self.exchange(&request), "cartridge_info_ack")?;
-        let response = Self::stage(self.read_exact(256), "cartridge_info_data")?;
+        let ack = Self::stage(self.exchange(&request), "cartridge_info_ack")?;
+        self.streaming_protocol = ack.starts_with(&[0xc0, 0xde]);
+        let response = if self.streaming_protocol {
+            let mut ready = ack;
+            ready.extend(self.read_exact(STREAM_FRAME - FRAME)?);
+            validate_stream_status(&ready, 4, 0)?;
+            let response = Self::stage(self.read_exact(STREAM_FRAME), "cartridge_info_data")?;
+            Self::stage(self.stream_status(4, 1), "cartridge_info_done")?;
+            response
+        } else {
+            if ack.iter().any(|&b| b != 0) {
+                return Err(unexpected_reply("cartridge_info_ack", &ack));
+            }
+            Self::stage(self.read_exact(256), "cartridge_info_data")?
+        };
         let first = &response[..PAYLOAD];
+        if first[0] >= 9 && first[26] != 0 {
+            self.identity["firmware_version"] =
+                json!(format!("{}.{}.{}", first[26], first[27], first[28]));
+        }
+        if self.streaming_protocol && self.identity["firmware_version"] != "10.0.10" {
+            return Err(Error::new(
+                "OPERATOR_FIRMWARE_UNSUPPORTED",
+                "This GB Operator streaming firmware has not been qualified.",
+                "Use Playback to read this cartridge and include the firmware version when requesting Cartridge Studio support.",
+            ).details(json!({"firmware":self.identity["firmware_version"]})));
+        }
+        self.identity["operator_protocol"] = json!(if self.streaming_protocol {
+            "streaming"
+        } else {
+            "legacy"
+        });
         if first[3] == 0 && first[4] == 0 {
             return Err(Error::new(
                 "CARTRIDGE_NOT_FOUND",
@@ -310,14 +363,26 @@ impl Reader {
             )
             .details(json!({"cartridge_info":hex::encode(&first[..PAYLOAD])})));
         }
-        if first[0] >= 9 && first[26] != 0 {
-            self.identity["firmware_version"] =
-                json!(format!("{}.{}.{}", first[26], first[27], first[28]));
-        }
         self.identity["operator_cartridge_kind"] = json!(first[2]);
         self.identity["operator_cartridge_record"] = json!(hex::encode(first));
-        let rom_bytes = u32::from_le_bytes([first[5], first[6], first[7], 0]) as usize;
-        let ram_bytes = u32::from_le_bytes([first[9], first[10], first[11], 0]) as usize;
+        let (rom_bytes, ram_bytes) = if self.streaming_protocol {
+            let rom_bytes = 1usize.checked_shl(first[5] as u32).unwrap_or(0);
+            let ram_bytes = match first[6] {
+                0 => 0,
+                11..=17 => 1usize << first[6],
+                _ => {
+                    return Err(Error::check(
+                        "GB Operator returned an unknown RAM-size exponent.",
+                    ))
+                }
+            };
+            (rom_bytes, ram_bytes)
+        } else {
+            (
+                u32::from_le_bytes([first[5], first[6], first[7], 0]) as usize,
+                u32::from_le_bytes([first[9], first[10], first[11], 0]) as usize,
+            )
+        };
         if !(32 * 1024..=8 * 1024 * 1024).contains(&rom_bytes)
             || !rom_bytes.is_multiple_of(16 * 1024)
         {
@@ -333,12 +398,61 @@ impl Reader {
             ram_bytes,
         })
     }
+    /// Non-destructive firmware flash detection. This classification is not a
+    /// JEDEC identity and must not qualify a production writer by itself.
+    pub fn detect_flashcart(&mut self) -> Result<Value> {
+        self.cartridge_info()?;
+        if !self.streaming_protocol {
+            return Err(Error::new("OPERATOR_DETECTION_UNAVAILABLE",
+                "This Operator firmware does not expose the qualified flash detection protocol.",
+                "Use Playback to check for a firmware update; firmware updates require your approval."));
+        }
+        self.cancel.check()?;
+        self.wire.write_frame(&command(&[0x15])?)?;
+        self.stream_status(0x15, 0)?;
+        let data = self.read_exact(STREAM_FRAME)?;
+        self.stream_status(0x15, 1)?;
+        let capacity = if data[1] == 0 {
+            None
+        } else {
+            1u32.checked_shl(data[1] as u32)
+        };
+        Ok(json!({"firmware":self.identity["firmware_version"],
+            "cartridge_kind":data[0],"reported_capacity":capacity,
+            "flash_type":data[2],"reported_writable":data[3] != 0,
+            "record":hex::encode(&data[..16]),"jedec_id":null}))
+    }
+
+    /// Read a caller-confirmed GB physical capacity for hardware qualification.
+    /// This does not infer capacity from the ROM or qualify programming.
+    pub fn read_confirmed_gb_capacity(&mut self, capacity: usize) -> Result<Vec<u8>> {
+        if !(32 * 1024..=8 * 1024 * 1024).contains(&capacity) || !capacity.is_power_of_two() {
+            return Err(Error::check(
+                "Confirmed Game Boy capacity must be a power of two between 32 KiB and 8 MiB.",
+            ));
+        }
+        if !matches!(self.cartridge_info()?, CartridgeInfo::GameBoy { .. }) {
+            return Err(Error::check(
+                "Confirmed Game Boy capacity cannot be used for a GBA cartridge.",
+            ));
+        }
+        self.read_rom(capacity)
+    }
+
     fn read_rom(&mut self, size: usize) -> Result<Vec<u8>> {
         let mut payload = vec![0x00, 0x00];
         let bytes = (size as u32).to_le_bytes();
         let significant = ((32 - (size as u32).leading_zeros()) as usize).div_ceil(8);
         payload.extend_from_slice(&bytes[..significant.max(1)]);
         let request = command(&payload)?;
+        if self.streaming_protocol {
+            self.cancel.check()?;
+            self.wire.write_frame(&request)?;
+            Self::stage(self.stream_status(0, 0), "rom_ready")?;
+            let data = Self::stage(self.read_exact(size), "rom_data")?;
+            Self::stage(self.stream_status(0, 1), "rom_done")?;
+            return Ok(data);
+        }
         let _first_ack = Self::stage(self.exchange(&request), "rom_request_ack")?;
         let _second_ack = Self::stage(self.exchange(&[0; FRAME]), "rom_start_ack")?;
         let mut data = Vec::with_capacity(size);
@@ -439,8 +553,8 @@ impl Reader {
 }
 
 fn unexpected_reply(stage: &str, reply: &[u8]) -> Error {
-    Error::new("OPERATOR_UNEXPECTED_REPLY", "The Operator returned an unrecognized programming response.",
-        "Keep the report and backups. Reconnect USB before recovery; do not treat this write as successful.")
+    Error::new("OPERATOR_UNEXPECTED_REPLY", "The Operator returned an unrecognized protocol response.",
+        "Keep the report and any backups. Close other cartridge software, reconnect USB and retry; the operation was not verified.")
         .details(json!({"operator_stage":stage,"reply":hex::encode(reply)}))
 }
 
@@ -794,6 +908,124 @@ mod tests {
         });
         (r, sent)
     }
+    fn stream_packet(opcode: u8, state: u8) -> Vec<u8> {
+        let mut data = vec![0; STREAM_FRAME];
+        data[..5].copy_from_slice(&[0xc0, 0xde, state, opcode, !opcode]);
+        data
+    }
+    fn stream_info(kind: u8) -> Vec<u8> {
+        let mut data = vec![0; STREAM_FRAME];
+        data[0] = 10;
+        data[2] = kind;
+        data[3] = 1;
+        data[4] = 1;
+        data[5] = 18;
+        data[6] = 15;
+        data[26..29].copy_from_slice(&[10, 0, 10]);
+        data
+    }
+    fn streaming_reader(packets: Vec<Vec<u8>>) -> (Reader, Rc<RefCell<Vec<[u8; FRAME]>>>) {
+        // Physical USB responses may split at any boundary; the first info
+        // handshake must end at 64 bytes before protocol negotiation proceeds.
+        let replies = packets
+            .into_iter()
+            .flat_map(|p| {
+                p.chunks(FRAME)
+                    .flat_map(|c| c.chunks(16).map(<[u8]>::to_vec))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        programming_reader(replies)
+    }
+    #[test]
+    fn streaming_firmware_reads_fresh_rom_without_legacy_handshakes() {
+        let rom = vec![0xa5; 256 * 1024];
+        let (mut reader, sent) = streaming_reader(vec![
+            stream_packet(4, 0),
+            stream_info(0x22),
+            stream_packet(4, 1),
+            stream_packet(0, 0),
+            rom.clone(),
+            stream_packet(0, 1),
+            stream_packet(0, 0),
+            vec![0x5a; rom.len()],
+            stream_packet(0, 1),
+        ]);
+        gb::RomReader::initialize(&mut reader).unwrap();
+        assert_eq!(reader.rom, rom);
+        assert_eq!(reader.identity["firmware_version"], "10.0.10");
+        assert_eq!(reader.identity["cartridge_ram_bytes"], 32768);
+        assert_eq!(reader.read_rom(rom.len()).unwrap(), vec![0x5a; rom.len()]);
+        assert_eq!(
+            sent.borrow().iter().map(|f| f[0]).collect::<Vec<_>>(),
+            [4, 0, 0]
+        );
+    }
+    #[test]
+    fn streaming_rejects_wrong_status_corrupt_padding_and_missing_completion() {
+        for offset in [0, 2, 3, 4, 100, 511] {
+            let mut bad = stream_packet(0, 1);
+            bad[offset] ^= 1;
+            assert!(validate_stream_status(&bad, 0, 1).is_err());
+        }
+        let (mut reader, _) = streaming_reader(vec![stream_packet(0, 0), vec![0; 512]]);
+        reader.streaming_protocol = true;
+        let error = reader.read_rom(512).unwrap_err();
+        assert_eq!(error.details["operator_stage"], "rom_done");
+    }
+    #[test]
+    fn streaming_rejects_unqualified_version_and_invalid_size_before_rom_command() {
+        for (offset, value) in [(28, 11), (5, 255), (6, 255)] {
+            let mut info = stream_info(0x20);
+            info[offset] = value;
+            let (mut reader, sent) =
+                streaming_reader(vec![stream_packet(4, 0), info, stream_packet(4, 1)]);
+            assert!(gb::RomReader::initialize(&mut reader).is_err());
+            assert_eq!(sent.borrow().len(), 1);
+            assert_eq!(sent.borrow()[0][0], 4);
+        }
+    }
+    #[test]
+    fn streaming_flash_detection_does_not_invent_capacity_or_send_write_commands() {
+        let mut flash = vec![0; STREAM_FRAME];
+        flash[0] = 0x20;
+        let (mut reader, sent) = streaming_reader(vec![
+            stream_packet(4, 0),
+            stream_info(0x20),
+            stream_packet(4, 1),
+            stream_packet(0x15, 0),
+            flash,
+            stream_packet(0x15, 1),
+        ]);
+        let detection = reader.detect_flashcart().unwrap();
+        assert_eq!(detection["reported_writable"], false);
+        assert_eq!(detection["reported_capacity"], Value::Null);
+        assert_eq!(detection["jedec_id"], Value::Null);
+        assert_eq!(
+            sent.borrow().iter().map(|f| f[0]).collect::<Vec<_>>(),
+            [4, 0x15]
+        );
+    }
+
+    #[test]
+    fn streaming_gba_header_probe_uses_streaming_protocol() {
+        let (mut reader, sent) = streaming_reader(vec![
+            stream_packet(4, 0),
+            stream_info(0x30),
+            stream_packet(4, 1),
+            stream_packet(0, 0),
+            vec![0x5a; 256],
+            stream_packet(0, 1),
+        ]);
+        gba::RomReader::initialize(&mut reader).unwrap();
+        assert_eq!(
+            gba::RomReader::read(&mut reader, 0, 256).unwrap(),
+            vec![0x5a; 256]
+        );
+        assert_eq!(reader.identity["firmware_version"], "10.0.10");
+        assert_eq!(sent.borrow().len(), 2);
+    }
+
     #[test]
     fn legacy_write_has_crc_command_bank_handshakes_and_exact_data() {
         let mut busy = vec![0; FRAME];
