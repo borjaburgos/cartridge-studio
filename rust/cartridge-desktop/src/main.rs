@@ -68,10 +68,12 @@ enum Message {
     SaveRom,
     SavePath(String),
     SaveCopy,
+    #[cfg(target_os = "macos")]
     ChooseLibrary,
     #[cfg(target_os = "macos")]
     MacMenu(macos::Action),
 }
+#[cfg(target_os = "macos")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PendingExit {
     Hide,
@@ -82,6 +84,7 @@ struct Desktop {
     modal: Option<Modal>,
     size: Size,
     library_path: String,
+    #[cfg(target_os = "macos")]
     pending_exit: Option<PendingExit>,
 }
 impl Desktop {
@@ -102,6 +105,7 @@ impl Desktop {
             modal: None,
             size: options.size,
             library_path,
+            #[cfg(target_os = "macos")]
             pending_exit: None,
         }
     }
@@ -124,35 +128,36 @@ impl Desktop {
         if self.small() && !small_allowed {
             return Task::none();
         }
-        if (self.modal.is_some() || self.app.review.is_some())
-            && matches!(
-                message,
-                Message::Action(_)
-                    | Message::Platform(_)
-                    | Message::Profile(_)
-                    | Message::Reader(_)
-                    | Message::Page(_)
-                    | Message::Load
-                    | Message::Double(_)
-                    | Message::GbaSize(_)
-                    | Message::Strict(_)
-                    | Message::Artwork(_)
-                    | Message::Light(_)
-                    | Message::Library(_)
-                    | Message::ChooseLibrary
-                    | Message::SaveSettings
-                    | Message::FetchArtwork
-                    | Message::SaveRom
-                    | Message::Activity
-                    | Message::Hashes
-                    | Message::Report(_)
-            )
-        {
+        let modal_blocked = matches!(
+            &message,
+            Message::Action(_)
+                | Message::Platform(_)
+                | Message::Profile(_)
+                | Message::Reader(_)
+                | Message::Page(_)
+                | Message::Load
+                | Message::Double(_)
+                | Message::GbaSize(_)
+                | Message::Strict(_)
+                | Message::Artwork(_)
+                | Message::Light(_)
+                | Message::Library(_)
+                | Message::SaveSettings
+                | Message::FetchArtwork
+                | Message::SaveRom
+                | Message::Activity
+                | Message::Hashes
+                | Message::Report(_)
+        );
+        #[cfg(target_os = "macos")]
+        let modal_blocked = modal_blocked || matches!(&message, Message::ChooseLibrary);
+        if (self.modal.is_some() || self.app.review.is_some()) && modal_blocked {
             return Task::none();
         }
         match message {
             Message::Tick => {
                 self.app.poll();
+                #[cfg(target_os = "macos")]
                 if !self.app.busy() {
                     match self.pending_exit.take() {
                         Some(PendingExit::Quit) => return iced::exit(),
@@ -314,7 +319,10 @@ impl Desktop {
             Message::CloseModal => {
                 self.modal = None;
                 self.app.review = None;
-                self.pending_exit = None;
+                #[cfg(target_os = "macos")]
+                {
+                    self.pending_exit = None;
+                }
             }
             Message::Hashes => {
                 self.modal = Some(Modal::Hashes {
@@ -465,8 +473,8 @@ impl Desktop {
                     self.handle(r);
                 }
             }
+            #[cfg(target_os = "macos")]
             Message::ChooseLibrary => {
-                #[cfg(target_os = "macos")]
                 if let Some(path) = macos::choose_library(&self.app.settings.data_directory) {
                     self.library_path = path.display().to_string();
                     return self.update(Message::SaveSettings);
