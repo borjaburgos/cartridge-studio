@@ -156,6 +156,46 @@ the error and recovery paths. The USB library's cancellation path can wait beyon
 its transfer timeout; this is a diagnostic concern, not a proven cause of this
 attempt's slow progress. No debugger was attached to the running write.
 
+## Vendor reference investigation
+
+A subsequent retry retained two fresh full-capacity backups through the Operator.
+Both matched the recovered v0.7.2 image and its blank padding. An isolated copy of
+the official Playback 1.10.0 Linux AppImage was then inspected using temporary UI
+and transport logging helpers. These helpers and vendor files are research-only,
+outside the application and distribution.
+
+Playback uses the CDC serial interface on this firmware. It called the cartridge
+rewritable, but its upload dialog reported only 32 KiB capacity. The independently
+confirmed physical capacity is 512 KiB; neither this dialog nor the ROM header
+establishes flash identity. The authorized reference upload used the same pinned
+256 KiB v0.7.2 source. Its command payload began `01 00 00 00 04 00 00 00 00 00`
+and used the same command CRC scheme as the provisional adapter.
+
+The capture contained one 64-byte zero response, followed by a device disconnect
+and reconnect before any ROM data frames. Two independent full readbacks after
+Playback closed matched both pre-test backups exactly. This attempt did not
+qualify writing, and the existing game remained intact. The disconnect is
+consistent with an operation timeout/reset, but its exact cause is unproven.
+
+A cold-power-on reference test, before native reader access, is needed to rule
+out retained mapper or firmware state. Epilogue documented Ferrante 512 support
+before firmware 9.5; a firmware upgrade must not be assumed necessary or applied
+automatically. The inspected Linux 1.10.0 and 1.8.0 binaries use a disabled local
+update URL; this observation does not establish that no newer firmware exists.
+
+The official manifest used by the macOS release was subsequently located at
+`https://ci.epilogue.co/v1/manifest`. It advertises GB Operator application firmware
+10.0.10 and core 2.0.0. With the isolated Linux app's manifest request directed to
+that same endpoint, Playback identified this reader as board revision 1 and
+offered a device update. Only the metadata request was redirected: no firmware,
+checksum, download authentication, or update execution was replaced. The update
+has not been started and requires the user's explicit approval. A direct firmware
+download requires vendor authorization; use Playback's authenticated update flow.
+
+The reference failure is covered by a transport regression test: a command ACK
+split into 60 + 4 bytes, without an erase-ready response, must fail at the erase
+stage without sending a bank handshake or any ROM data.
+
 ## References
 
 - [Requested game release](https://github.com/borjaburgos/solarstriker-dx-captain-felipe/releases/tag/v0.7.2)

@@ -844,6 +844,23 @@ mod tests {
         }
     }
     #[test]
+    fn vendor_command_ack_without_erase_ready_never_sends_rom_data() {
+        // Playback's failed 9.5.0 reference attempt received a command ACK as
+        // 60 + 4 bytes, then lost the device before erase readiness. That ACK
+        // alone must never be treated as permission to start data streaming.
+        let (mut r, sent) = programming_reader(vec![vec![0; 60], vec![0; 4]]);
+        r.info = Some(CartridgeInfo::GameBoy {
+            rom_bytes: 262144,
+            ram_bytes: 0,
+        });
+        let error = r.program_legacy(&vec![0; 524288], &mut |_| {}).unwrap_err();
+        assert_eq!(error.code, "OPERATOR_USB_TIMEOUT");
+        assert_eq!(error.details["operator_stage"], "erase_status");
+        assert_eq!(sent.borrow().len(), 1);
+        assert_eq!(&sent.borrow()[0][..10], &[1, 0, 0, 0, 8, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
     fn data_rejection_records_exact_offset_and_stops_streaming() {
         // Command, erase-ready, first bank handshake, then ten data ACKs.
         let mut replies = vec![vec![0; FRAME]; 13];
