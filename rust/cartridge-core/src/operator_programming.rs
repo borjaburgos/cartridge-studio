@@ -15,8 +15,8 @@ pub const POLICY: &str = "operator-combined-verified-v1";
 pub fn unavailable() -> Error {
     Error::new(
         "OPERATOR_PROGRAMMING_NOT_QUALIFIED",
-        "GB Operator programming is awaiting hardware qualification.",
-        "Use a qualified Ferrante profile with GBxCart RW or INLretro for now. The Operator needs a confirmed physical flash identity and validated programming responses before writing can be enabled; changing the ROM profile cannot bypass this.",
+        "GB Operator programming has not passed Ferrante 512 hardware qualification.",
+        "Use the qualified Ferrante profile with GBxCart RW or INLretro. The Operator firmware 9.5.0 test did not erase and program correctly, so writing remains disabled. Selecting a different ROM profile cannot bypass this.",
     )
 }
 
@@ -27,8 +27,9 @@ pub struct Qualification {
     pub firmware: String,
     pub profile: String,
     pub capacity: usize,
-    pub manufacturer_id: u8,
-    pub device_id: u8,
+    pub identification: String,
+    pub manufacturer_id: Option<u8>,
+    pub device_id: Option<u8>,
 }
 impl Qualification {
     fn validate(&self) -> Result<()> {
@@ -36,8 +37,13 @@ impl Qualification {
             || self.firmware.is_empty()
             || self.profile != rom::GB_PROFILE
             || self.capacity != CAPACITY
-            || self.manufacturer_id != 0xbf
-            || self.device_id != 0xb7
+            || !((self.identification == "electronic-flash-id"
+                && self.manufacturer_id == Some(0xbf)
+                && self.device_id == Some(0xb7))
+                || (self.identification == "user-confirmed-ferrante-512"
+                    && self.firmware == "9.5.0"
+                    && self.manufacturer_id.is_none()
+                    && self.device_id.is_none()))
         {
             return Err(unavailable().details(json!({"qualification":self})));
         }
@@ -46,7 +52,7 @@ impl Qualification {
 }
 
 /// Implement only after the firmware/profile pair has been physically qualified.
-/// There is deliberately no USB implementation until that requirement is met.
+/// The legacy adapter records manual board confirmation separately from chip IDs.
 pub trait Programmer {
     /// Must freshly inspect the physical board and validate firmware applicability.
     fn qualify(&mut self) -> Result<Qualification>;
@@ -176,6 +182,14 @@ pub fn write_with(
         j.report["unused_flash_blank"] = json!(true);
         Ok(())
     })();
+    // Persist the transport failure before USB cleanup, which can itself stall
+    // while the device is awaiting more data. Never lose the recovery context.
+    if let Err(error) = &result {
+        j.report["hardware_error"] = json!(error);
+        j.report["cleanup_pending"] = json!(true);
+        let _ = j.save();
+    }
     let close = r.close();
+    j.report["cleanup_pending"] = json!(false);
     j.finish(cleanup(result, close))
 }

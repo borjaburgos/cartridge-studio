@@ -1,9 +1,9 @@
 # GB Operator programming investigation
 
-Status: the separate Rust transaction policy is implemented and tested with
-injected hardware. The USB programming adapter is not implemented or qualified;
-ROM writing and wiping remain disabled. The cartridge has not been erased or
-programmed by this investigation.
+Status: the separate Rust transaction and a provisional legacy USB adapter are
+implemented. A physical firmware 9.5.0 / Ferrante 512 attempt failed erase/program
+qualification. Production ROM writing and wiping remain disabled, including a
+guard inside the adapter. Synthetic tests do not override this hardware result.
 
 ## Verified locally
 
@@ -11,7 +11,8 @@ On 2026-09-27, the connected GB Operator advertised USB device version 1.11.
 Its cartridge record identifies firmware 9.5.0; USB device version and firmware
 version are different fields.
 
-The user described the inserted cartridge as a Ferrante. Its existing ROM is
+The user explicitly confirmed the physical cartridge as a Ferrante 512. Before
+the write attempt, its existing ROM was
 512 KiB, MBC5, Color-compatible, with valid header and global checksums. Two
 independent native Rust backups match. Separately captured read-only backups
 match those native results. This proves repeatable reading, not the physical
@@ -52,7 +53,8 @@ for a readback, or upgrade firmware automatically.
 
 ## Work required before enabling writes
 
-1. Confirm the physical Ferrante model and flash chip independently of its header.
+1. Resolve the failed erase/program result below. The physical model is user-confirmed;
+   no electronic JEDEC ID has been obtained through the Operator.
 2. Establish the command framing, firmware applicability, identification result,
    erase status, data pacing, completion status and cancellation behavior from
    documented protocol evidence or controlled reference traces.
@@ -75,11 +77,12 @@ does not enable YOLO mode or permit an unknown physical board.
 `cartridge-core::operator_programming::write_with` implements this policy:
 
 1. Validate the reviewed SHA-256 and compatible source; durably retain the source.
-2. Require physical Ferrante 512 / SST39SF040 identification and an adapter that
-   has qualified the firmware protocol. A source header or selected profile is
-   not identification evidence.
+2. Record the physical board evidence and require a qualified firmware protocol.
+   For the controlled attempt, the user explicitly confirmed Ferrante 512. Reports
+   distinguish this from electronic identification and leave JEDEC IDs null; they
+   must never substitute the ROM header or invent observed flash-chip IDs.
 3. Save two fresh, complete 512 KiB backups and require equality.
-4. Recheck physical identity and cancellation before entering a durably recorded
+4. Recheck the device and cartridge record and cancellation before a durably recorded
    combined erase/program stage.
 5. Program a full-capacity target with unused bytes padded to `FF`.
 6. Independently read all 512 KiB twice, comparing both reads to the padded target.
@@ -103,11 +106,40 @@ Static interoperability research on Playback 1.10.0 shows that USB product
 from the newer Detect Flashcart command path. No newer command has been sent as
 a speculative detection probe.
 
-Legacy write framing and bank/data pacing have been located, but a reliable
-physical flash-identification result and explicit erase-success/error semantics
-remain unqualified. A controlled reference trace on a confirmed board is the
-next hardware step. Do not treat a response other than an erase-busy marker as
-proof of success, nor use a destructive write command to discover board identity.
+Legacy framing uses command 1, save-chip classification, ROM byte length and
+reported save byte length, followed by the command CRC. The host exchanges a
+zero-filled handshake before each 256 data frames and exchanges 64-byte data
+frames individually. These are interoperability findings, not a successful
+qualification. The provisional adapter accepts only zero-filled acknowledgements
+and the known erase-busy marker; an acknowledgement is never proof of erasure.
+
+A controlled reference trace with an independently verified erase remains needed.
+Do not use a destructive command to discover board identity or enable this
+firmware/profile pair based on the synthetic transport tests.
+
+## Failed physical attempt and recovery
+
+On 2026-09-27 (local time), the explicitly authorized write retained a pinned
+v0.7.2 source and two fresh matching full-capacity backups before command 1. The
+Operator acknowledged erase readiness. Progress was unexpectedly slow; after a
+requested USB reconnect, the transport returned an endpoint-stall error at byte
+offset 23,488. This does not establish the cause of the stall or prove that the
+firmware alone is responsible.
+
+Initial recovery reads disagreed. After reseating with USB disconnected, two
+512 KiB reads agreed. They differed from the original backup in 6,053 bytes,
+mostly consistent with programming bits without a complete erase. They did not
+match the requested game. Neither the interrupted image nor the operation is
+reported as successful. The original backups remain intact.
+
+The user has been asked to move the cartridge to GBxCart RW for recovery using
+the already-qualified transaction. The local investigation record tracks the
+recovery outcome; do not claim recovery before two final readbacks pass.
+
+Hardware failures are journaled before USB cleanup so a cleanup stall cannot hide
+the error and recovery paths. The USB library's cancellation path can wait beyond
+its transfer timeout; this is a diagnostic concern, not a proven cause of this
+attempt's slow progress. No debugger was attached to the running write.
 
 ## References
 

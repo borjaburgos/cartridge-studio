@@ -92,8 +92,10 @@ catalog pipeline as the other readers. Cartridge Studio contains no Playback cod
 or runtime. GBA records do not include the ROM size, so the driver first reads the
 256-byte header. A unique catalog game-code size becomes provisional until the
 complete hash matches; unknown games use the shared mirroring/full-window sizing
-path. Each backup pass is a separate complete device stream. Save commands and
-cartridge programming commands are absent from this driver.
+path. Each backup pass is a separate complete device stream. Save commands are
+absent. Provisional ROM programming remains disabled in normal builds: the
+firmware 9.5.0 / Ferrante 512 hardware attempt failed erase/program qualification.
+Use GBxCart RW or INLretro with the qualified Ferrante profile for writing.
 
 The GB reader accepts the `0x20`, `0x21` and `0x22` cartridge-kind records;
 previous builds incorrectly rejected Color variants such as the `0x22` record

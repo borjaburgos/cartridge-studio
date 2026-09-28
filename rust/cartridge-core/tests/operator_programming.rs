@@ -34,8 +34,9 @@ impl Programmer for Fake {
             firmware: "synthetic-qualified-firmware".into(),
             profile: GB_PROFILE.into(),
             capacity: CAPACITY,
-            manufacturer_id: 0xbf,
-            device_id: if s.fault == "wrong-chip" { 0xb6 } else { 0xb7 },
+            identification: "electronic-flash-id".into(),
+            manufacturer_id: Some(0xbf),
+            device_id: Some(if s.fault == "wrong-chip" { 0xb6 } else { 0xb7 }),
         })
     }
     fn read_full(&mut self, size: usize) -> Result<Vec<u8>> {

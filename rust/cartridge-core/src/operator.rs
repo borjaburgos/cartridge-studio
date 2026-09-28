@@ -1,21 +1,24 @@
-//! Native, read-only Epilogue GB Operator transport.
+//! Native Epilogue GB Operator ROM transport.
 //!
-//! The reader uses 64-byte frames on its CDC data interface. ROM programming
-//! and save-memory commands are intentionally absent until compatible writable
-//! cartridges and save transactions receive separate physical qualification.
+//! The reader uses 64-byte frames on its CDC data interface. The provisional
+//! ROM writer failed physical qualification and remains gated off outside
+//! injected tests. Save-memory commands are not implemented.
 use crate::{gb, gba, storage::Cancel, Error, Result};
 use nusb::{
     transfer::{Buffer, Bulk, In, Out, TransferError},
     Endpoint, Interface, MaybeFuture,
 };
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const VID: u16 = 0x16d0;
 const PID: u16 = 0x123d;
 const FRAME: usize = 64;
 const PAYLOAD: usize = 60;
 const ACK_INTERVAL: usize = 320;
+// The real 9.5.0/Ferrante attempt failed erase/program qualification.
+// Only injected tests may exercise the provisional transport until requalified.
+const LEGACY_WRITE_QUALIFIED: bool = cfg!(test);
 
 fn io_error(e: impl std::fmt::Display) -> Error {
     Error::new(
@@ -351,12 +354,161 @@ impl Reader {
         data.truncate(size);
         Ok(data)
     }
+    fn checked_ack(&mut self, frame: &[u8; FRAME], stage: &str) -> Result<()> {
+        let reply = Self::stage(self.exchange(frame), stage)?;
+        if reply.iter().any(|b| *b != 0) {
+            return Err(unexpected_reply(stage, &reply));
+        }
+        Ok(())
+    }
+
+    fn program_legacy(&mut self, target: &[u8], progress: &mut dyn FnMut(String)) -> Result<Value> {
+        if !LEGACY_WRITE_QUALIFIED {
+            return Err(crate::operator_programming::unavailable());
+        }
+        if target.len() != crate::rom::CAPACITY || self.identity["firmware_version"] != "9.5.0" {
+            return Err(crate::operator_programming::unavailable());
+        }
+        let ram_bytes = match self.info {
+            Some(CartridgeInfo::GameBoy { ram_bytes, .. }) => ram_bytes,
+            _ => return Err(crate::operator_programming::unavailable()),
+        };
+        let mut payload = vec![1, if ram_bytes == 0 { 0 } else { 2 }];
+        payload.extend_from_slice(&(target.len() as u32).to_le_bytes());
+        payload.extend_from_slice(&(ram_bytes as u32).to_le_bytes());
+        self.rom.clear();
+        self.checked_ack(&command(&payload)?, "write_command_ack")?;
+        let started = Instant::now();
+        let mut busy_packets = 0u32;
+        loop {
+            self.cancel.check()?;
+            if started.elapsed() >= Duration::from_secs(420) || busy_packets >= 100_000 {
+                return Err(Error::new("OPERATOR_ERASE_TIMEOUT", "The Operator did not finish erasing in time.",
+                    "Keep the backups and report. Reconnect USB before recovery; the cartridge may be partially erased."));
+            }
+            let reply = Self::stage(self.read_exact(FRAME), "erase_status")?;
+            if reply.iter().all(|b| *b == 0) {
+                break;
+            }
+            if reply[..2] == [0x33, 0xcc] && reply[2..].iter().all(|b| *b == 0) {
+                busy_packets += 1;
+            } else {
+                return Err(unexpected_reply("erase_status", &reply));
+            }
+        }
+        progress("Operator is ready for ROM data; final readbacks will verify the result.".into());
+        for (index, frame) in target.as_chunks::<FRAME>().0.iter().enumerate() {
+            if index.is_multiple_of(256) {
+                progress(format!("Starting bank {}/32…", index / 256 + 1));
+                self.checked_ack(&[0; FRAME], "write_bank_ack")?;
+            }
+            self.checked_ack(frame, "write_data_ack").map_err(|mut e| {
+                e.details["offset"] = json!(index * FRAME);
+                e
+            })?;
+            if (index + 1).is_multiple_of(256) {
+                progress(format!(
+                    "Programmed: {}/512 KiB",
+                    (index + 1) * FRAME / 1024
+                ));
+            }
+        }
+        Ok(json!({"protocol":"legacy-9.5.0","command":1,
+            "save_chip_parameter":payload[1],"save_bytes_parameter":ram_bytes,
+            "erase_busy_packets":busy_packets,"erase_ready_reply":"zero-filled-64-byte-frame",
+            "data_frames":target.len()/FRAME,"bank_handshakes":target.len()/16384,
+            "acknowledgements":"zero-filled-64-byte-frames","verification":false}))
+    }
+
+    /// The caller must explicitly confirm the physical Ferrante 512 board.
+    /// This never claims an electronically observed JEDEC ID.
+    pub fn confirmed_ferrante512(self) -> FerranteProgrammer {
+        FerranteProgrammer {
+            reader: self,
+            record: None,
+        }
+    }
+
     fn close_device(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
         }
         self.closed = true;
         self.wire.close()
+    }
+}
+
+fn unexpected_reply(stage: &str, reply: &[u8]) -> Error {
+    Error::new("OPERATOR_UNEXPECTED_REPLY", "The Operator returned an unrecognized programming response.",
+        "Keep the report and backups. Reconnect USB before recovery; do not treat this write as successful.")
+        .details(json!({"operator_stage":stage,"reply":hex::encode(reply)}))
+}
+
+pub struct FerranteProgrammer {
+    reader: Reader,
+    record: Option<String>,
+}
+impl crate::operator_programming::Programmer for FerranteProgrammer {
+    fn qualify(&mut self) -> Result<crate::operator_programming::Qualification> {
+        if !LEGACY_WRITE_QUALIFIED {
+            return Err(crate::operator_programming::unavailable());
+        }
+        let info = self.reader.cartridge_info()?;
+        let record = self.reader.identity["operator_cartridge_record"]
+            .as_str()
+            .unwrap_or("")
+            .to_owned();
+        let bytes = hex::decode(&record).map_err(|_| crate::operator_programming::unavailable())?;
+        if self.reader.identity["firmware_version"] != "9.5.0"
+            || bytes.len() < 29
+            || ![0x19, 0x1a, 0x1b].contains(&bytes[14])
+            || !matches!(info, CartridgeInfo::GameBoy {rom_bytes, ..} if rom_bytes <= crate::rom::CAPACITY)
+        {
+            return Err(
+                crate::operator_programming::unavailable().details(self.reader.identity.clone())
+            );
+        }
+        if self.record.as_ref().is_some_and(|old| old != &record) {
+            return Err(Error::new(
+                "CARTRIDGE_CHANGED",
+                "The cartridge record changed during backup.",
+                "Reconnect the confirmed Ferrante 512 and retry into a new folder.",
+            ));
+        }
+        self.record = Some(record);
+        self.reader.info = Some(info);
+        Ok(crate::operator_programming::Qualification {
+            device_serial: self.reader.identity["serial"].as_str().unwrap_or("").into(),
+            firmware: "9.5.0".into(),
+            profile: crate::rom::GB_PROFILE.into(),
+            capacity: crate::rom::CAPACITY,
+            identification: "user-confirmed-ferrante-512".into(),
+            manufacturer_id: None,
+            device_id: None,
+        })
+    }
+    fn read_full(&mut self, capacity: usize) -> Result<Vec<u8>> {
+        if capacity != crate::rom::CAPACITY || self.record.is_none() {
+            return Err(crate::operator_programming::unavailable());
+        }
+        // Explicit size, fresh USB request each time; never read the cached ROM.
+        self.reader.read_rom(capacity)
+    }
+    fn erase_and_program(
+        &mut self,
+        target: &[u8],
+        progress: &mut dyn FnMut(String),
+    ) -> Result<Value> {
+        if self.record.is_none() {
+            return Err(crate::operator_programming::unavailable());
+        }
+        self.reader.program_legacy(target, progress)
+    }
+    fn check_cancel(&self) -> Result<()> {
+        self.reader.cancel.check()
+    }
+    fn close(&mut self) -> Result<()> {
+        self.reader.close_device()
     }
 }
 
@@ -603,6 +755,122 @@ mod tests {
         fn close(&mut self) -> Result<()> {
             Ok(())
         }
+    }
+
+    struct ProgramWire {
+        sent: Rc<RefCell<Vec<[u8; FRAME]>>>,
+        replies: VecDeque<Vec<u8>>,
+    }
+    impl Wire for ProgramWire {
+        fn identity(&self) -> Value {
+            json!({"driver":"operator","serial":"synthetic","firmware_version":"9.5.0"})
+        }
+        fn write_frame(&mut self, frame: &[u8; FRAME]) -> Result<()> {
+            self.sent.borrow_mut().push(*frame);
+            Ok(())
+        }
+        fn read_chunk(&mut self) -> Result<Vec<u8>> {
+            self.replies
+                .pop_front()
+                .ok_or_else(|| Error::new("OPERATOR_USB_TIMEOUT", "Timed out", "Reconnect"))
+        }
+        fn close(&mut self) -> Result<()> {
+            Ok(())
+        }
+    }
+    fn programming_reader(replies: Vec<Vec<u8>>) -> (Reader, Rc<RefCell<Vec<[u8; FRAME]>>>) {
+        let sent = Rc::new(RefCell::new(vec![]));
+        let mut r = Reader::connect(
+            Box::new(ProgramWire {
+                sent: sent.clone(),
+                replies: replies.into(),
+            }),
+            Cancel::default(),
+        )
+        .unwrap();
+        r.info = Some(CartridgeInfo::GameBoy {
+            rom_bytes: 524288,
+            ram_bytes: 32768,
+        });
+        (r, sent)
+    }
+    #[test]
+    fn legacy_write_has_crc_command_bank_handshakes_and_exact_data() {
+        let mut busy = vec![0; FRAME];
+        busy[..2].copy_from_slice(&[0x33, 0xcc]);
+        let mut replies = vec![vec![0; FRAME], busy, vec![0; FRAME]];
+        replies.extend(vec![vec![0; FRAME]; 8192 + 32]);
+        let (mut r, sent) = programming_reader(replies);
+        let target: Vec<u8> = (0..524288).map(|i| ((i / 16384 + i) % 251) as u8).collect();
+        let report = r.program_legacy(&target, &mut |_| {}).unwrap();
+        assert_eq!(report["erase_busy_packets"], 1);
+        assert_eq!(report["verification"], false);
+        let sent = sent.borrow();
+        assert_eq!(&sent[0][..10], &[1, 2, 0, 0, 8, 0, 0, 128, 0, 0]);
+        assert_eq!(
+            u32::from_le_bytes(sent[0][60..].try_into().unwrap()),
+            crc32_mpeg2(&sent[0][..60])
+        );
+        assert_eq!(sent.len(), 1 + 32 + 8192);
+        for bank in 0..32 {
+            let start = 1 + bank * 257;
+            assert_eq!(sent[start], [0; FRAME]);
+            let bytes: Vec<u8> = sent[start + 1..start + 257]
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            assert_eq!(bytes, target[bank * 16384..(bank + 1) * 16384]);
+        }
+    }
+    #[test]
+    fn legacy_write_stops_on_unknown_ack_erase_status_or_timeout() {
+        for (replies, code) in [
+            (vec![vec![0xee; FRAME]], "OPERATOR_UNEXPECTED_REPLY"),
+            (
+                vec![vec![0; FRAME], vec![0x55; FRAME]],
+                "OPERATOR_UNEXPECTED_REPLY",
+            ),
+            (vec![vec![0; FRAME]], "OPERATOR_USB_TIMEOUT"),
+        ] {
+            let (mut r, sent) = programming_reader(replies);
+            assert_eq!(
+                r.program_legacy(&vec![0; 524288], &mut |_| {})
+                    .unwrap_err()
+                    .code,
+                code
+            );
+            assert_eq!(sent.borrow().len(), 1);
+        }
+    }
+    #[test]
+    fn data_rejection_records_exact_offset_and_stops_streaming() {
+        // Command, erase-ready, first bank handshake, then ten data ACKs.
+        let mut replies = vec![vec![0; FRAME]; 13];
+        replies.push(vec![0xee; FRAME]);
+        let (mut r, sent) = programming_reader(replies);
+        let error = r.program_legacy(&vec![0; 524288], &mut |_| {}).unwrap_err();
+        assert_eq!(error.code, "OPERATOR_UNEXPECTED_REPLY");
+        assert_eq!(error.details["operator_stage"], "write_data_ack");
+        assert_eq!(error.details["offset"], 640);
+        assert_eq!(sent.borrow().len(), 13); // command + handshake + eleven data frames
+    }
+
+    #[test]
+    fn legacy_write_requires_exact_firmware_and_checks_cancellation_before_command() {
+        let (mut r, sent) = programming_reader(vec![]);
+        r.identity["firmware_version"] = json!("9.5.1");
+        assert!(r.program_legacy(&vec![0; 524288], &mut |_| {}).is_err());
+        assert!(sent.borrow().is_empty());
+        r.identity["firmware_version"] = json!("9.5.0");
+        r.cancel.0.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            r.program_legacy(&vec![0; 524288], &mut |_| {})
+                .unwrap_err()
+                .code,
+            "INTERRUPTED"
+        );
+        assert!(sent.borrow().is_empty());
     }
 
     #[test]
