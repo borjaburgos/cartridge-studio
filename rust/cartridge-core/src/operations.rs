@@ -1,7 +1,7 @@
 //! Durable backup / erase / program / verify transactions. All hardware is injected.
 use crate::{
     famicom, gb,
-    rom::{self, Board, NesRom, CAPACITY},
+    rom::{self, Board, NesRom},
     storage::{self, Cancel},
     usb::Bus,
     Error, Result,
@@ -175,11 +175,13 @@ pub fn gb_read_with(
     strict: bool,
     progress: &mut dyn FnMut(String),
 ) -> Result<Value> {
+    let capacity = r.flash_capacity();
+    let banks = capacity / 16384;
     let result = (|| {
         j.report["device"] = r.identity();
         let banks = if full {
             j.report["flash"] = r.identify_flash()?;
-            32
+            banks
         } else {
             r.initialize()?;
             let info = rom::gb_header(&r.header_bytes()?)?;
@@ -217,12 +219,12 @@ pub fn gb_read_with(
             let expected = source.ok_or_else(|| Error::check("Verification requires a source."))?;
             let mut target = expected.to_vec();
             if full {
-                if target.len() > CAPACITY {
+                if target.len() > capacity {
                     return Err(Error::check(
                         "The source exceeds the physical flash capacity.",
                     ));
                 }
-                target.resize(CAPACITY, 255);
+                target.resize(capacity, 255);
             }
             same(
                 &first,
@@ -306,20 +308,22 @@ pub fn gb_write_with(
     source: Option<&[u8]>,
     progress: &mut dyn FnMut(String),
 ) -> Result<Value> {
+    let capacity = r.flash_capacity();
+    let banks = capacity / 16384;
     if let Some(data) = source {
         j.put("source.gb", data)?;
         j.report["source"] = json!(j.directory.join("source.gb"));
-        j.report["source_info"] = rom::validate_gb_flash(data)?;
+        j.report["source_info"] = r.validate_program_source(data)?;
         j.save()?;
     }
     let result = (|| {
         j.report["device"] = r.identity();
         j.report["flash"] = r.identify_flash()?;
         j.stage("backing_up")?;
-        let first = gb_dump(r.as_mut(), j, "before.read1.bin", 32, progress)?;
+        let first = gb_dump(r.as_mut(), j, "before.read1.bin", banks, progress)?;
         r.initialize()?;
         r.enable_audio()?;
-        let second = gb_dump(r.as_mut(), j, "before.read2.bin", 32, progress)?;
+        let second = gb_dump(r.as_mut(), j, "before.read2.bin", banks, progress)?;
         same(
             &first,
             &second,
@@ -327,7 +331,7 @@ pub fn gb_write_with(
             "The two full-chip reads differ. Erase/write was not started.",
         )?;
         j.report["backup_sha256"] = json!(rom::sha(&first));
-        j.report["backup_bytes"] = json!(CAPACITY);
+        j.report["backup_bytes"] = json!(capacity);
         j.stage("backed_up")?;
         // Repeat identity after backup, then prove the helper before the first destructive command.
         let verified = r.identify_flash()?;
@@ -344,7 +348,7 @@ pub fn gb_write_with(
         j.stage("erasing")?;
         progress("Erasing the complete flash chip…".into());
         r.erase()?;
-        let erased = gb_dump(r.as_mut(), j, "erased.bin", 32, progress)?;
+        let erased = gb_dump(r.as_mut(), j, "erased.bin", banks, progress)?;
         if !blank(&erased) {
             return Err(mismatch(
                 "BLANK_CHECK_FAILED",
@@ -355,7 +359,7 @@ pub fn gb_write_with(
         j.stage("erased")?;
         if let Some(data) = source {
             let mut target = data.to_vec();
-            target.resize(CAPACITY, 255);
+            target.resize(capacity, 255);
             j.stage("programming")?;
             for (bank, expected) in data.as_chunks::<16384>().0.iter().enumerate() {
                 r.program_bank(bank, expected)?;
@@ -380,7 +384,13 @@ pub fn gb_write_with(
             for n in 1..=2 {
                 r.initialize()?;
                 r.enable_audio()?;
-                actual = gb_dump(r.as_mut(), j, &format!("after.read{n}.bin"), 32, progress)?;
+                actual = gb_dump(
+                    r.as_mut(),
+                    j,
+                    &format!("after.read{n}.bin"),
+                    banks,
+                    progress,
+                )?;
                 same(&actual,&target,"FINAL_VERIFY_FAILED","Complete readback differed from the target. Do not treat this write as successful.")?;
             }
             let readback = &actual[..data.len()];
@@ -393,7 +403,7 @@ pub fn gb_write_with(
             // Wipe also gets an independent, power-cycled final read.
             r.initialize()?;
             r.enable_audio()?;
-            let second = gb_dump(r.as_mut(), j, "erased.read2.bin", 32, progress)?;
+            let second = gb_dump(r.as_mut(), j, "erased.read2.bin", banks, progress)?;
             same(
                 &erased,
                 &second,

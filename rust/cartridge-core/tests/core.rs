@@ -412,3 +412,55 @@ fn source_snapshot_is_pinned_before_open_and_usb_failure_is_journaled() {
             .unwrap();
     assert_eq!(r["status"], "failed");
 }
+
+#[test]
+fn spansion_source_limits_are_checked_before_usb() {
+    use cartridge_core::readers::{self, Kind};
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("source.gb");
+    for (cart, ram, size, compatible) in [
+        (0x19, 0, 0, true),
+        (0x1a, 2, 7, true),
+        (0x1b, 3, 7, true),
+        (0x13, 3, 0, false),
+        (0x10, 3, 0, false),
+        (0x1e, 3, 0, false),
+        (0x1b, 4, 0, false),
+        (0x19, 3, 0, false),
+        (0x1a, 0, 0, false),
+        (0x19, 0, 8, false),
+    ] {
+        let mut data = gb();
+        data.resize(32768 << size, 0xff);
+        data[0x147] = cart;
+        data[0x148] = size;
+        data[0x149] = ram;
+        data[0x14d] = data[0x134..0x14d]
+            .iter()
+            .fold(0u8, |a, b| a.wrapping_sub(*b).wrapping_sub(1));
+        data[0x14e..0x150].fill(0);
+        let sum = data.iter().fold(0u16, |a, b| a.wrapping_add(*b as u16));
+        data[0x14e..0x150].copy_from_slice(&sum.to_be_bytes());
+        std::fs::write(&path, &data).unwrap();
+        let mut req = Request::new("check");
+        req.reader = Kind::Gbxcart;
+        req.platform = "gameboy".into();
+        req.profile = rom::SPANSION_PROFILE.into();
+        req.source = Some(path.clone());
+        let result = service::run_with(&req, Cancel::default(), &mut |_| {}, &mut |_| {
+            panic!("Offline compatibility opened USB")
+        });
+        assert_eq!(
+            result.is_ok(),
+            compatible,
+            "type={cart:x} ram={ram} size={size}: {result:?}"
+        );
+        data[0x200] ^= 1;
+        assert!(rom::validate_gb_flash_profile(&data, rom::SPANSION_PROFILE).is_err());
+    }
+    for reader in [Kind::Inlretro, Kind::Operator] {
+        for action in ["probe", "read", "backup", "write", "wipe"] {
+            assert!(readers::check(reader, "gameboy", rom::SPANSION_PROFILE, action).is_err());
+        }
+    }
+}

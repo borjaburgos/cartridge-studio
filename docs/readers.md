@@ -295,3 +295,42 @@ The Ferrante board commands are checked against the upstream
 [SST39SF040 AUDIO profile](https://github.com/lesserkuma/FlashGBX/blob/2d9682c0d1abbb556c27d7ba1715453c9776b563/FlashGBX/config/fc_DMG_SST39SF040_AUDIO.txt).
 GBxCart uses firmware A7 configuration, D4 flash sequences and D3 byte programming;
 normal mapper writes stay on B2. No upstream host implementation is bundled.
+
+## Spansion S29GL032M R4 (unreleased)
+
+The checkout adds **Spansion S29GL032M R4 · WR/MBC5 · 4 MiB** to the shared
+GUI/TUI/CLI profile list. It requires GBxCart PCB 6 / L14 and the physically
+confirmed board described in [the investigation](spansion-board-investigation.md).
+This is not a generic S29GL032M profile: other revisions, swapped data wiring,
+and other readers are rejected. Physical erase/program validation is pending;
+read/identification has been physically verified.
+
+The reader selects 3.3 V before powering the cartridge. Every destructive
+transaction requires responding ID `01 7E 1A 00`, the matching CFI command set
+and bottom-boot sector layout, unchanged ROM after identification, and a checked
+MBC5 bank-zero alias. It retains two matching 4 MiB backups and repeats identity
+before erasing. Programming uses the switchable ROM window, including bank zero,
+to avoid writes to the ROM bank registers. No automatic sector unlocking is used.
+
+Write accepts MBC5 type `0x19` without RAM, or types `0x1A`/`0x1B` with 8/32 KiB
+RAM, up to 4 MiB. Header, size and global checksums must match. MBC3/RTC, rumble
+and larger saves are rejected. This does not imply save-memory support: SRAM
+is not accessed, backed up or restored. Write erases first, checks every byte for
+blank state, verifies each bank, and compares two fresh full-capacity reads.
+Wipe retains the same backups and performs two full blank checks.
+
+```sh
+cartridge --reader gbxcart gameboy probe --profile s29gl032m-r4-wr-mbc5
+cartridge --reader gbxcart gameboy check /path/to/game.gbc --profile s29gl032m-r4-wr-mbc5
+cartridge --reader gbxcart gameboy write /path/to/game.gbc --profile s29gl032m-r4-wr-mbc5 --yes
+cartridge --reader gbxcart gameboy wipe --profile s29gl032m-r4-wr-mbc5 --yes
+```
+
+`gbxcart_spansion_program_qualification` is a separately invoked, destructive
+hardware example, never part of routine tests. It requires three identical retained
+full-capacity reads, a completed read-only report, a pinned SHA-256 and explicit
+confirmation. It writes/verifies a synthetic pattern across every bank, then
+restores the original bytes with the same backup, blank, bank and final checks.
+Its narrowly pinned raw-restoration adapter is confined to that example, because
+an existing backup can have an incompatible header or incorrect checksum. There
+is no GUI/worker option to bypass normal source compatibility validation.

@@ -5,7 +5,7 @@ use crate::{
 };
 use cartridge_core::{
     readers::{self, Kind},
-    rom::{BOARDS, GB_PROFILE},
+    rom::{BOARDS, GB_PROFILE, SPANSION_PROFILE},
     service::Request,
     storage,
 };
@@ -61,11 +61,18 @@ impl Platform {
         }];
         match self {
             Self::Gba => (),
-            Self::GameBoy => out.push(Profile {
-                id: GB_PROFILE,
-                name: "Ferrante 512 · SST39SF040 AUDIO/MBC5",
-                writable: true,
-            }),
+            Self::GameBoy => out.extend([
+                Profile {
+                    id: GB_PROFILE,
+                    name: "Ferrante 512 · SST39SF040 AUDIO/MBC5",
+                    writable: true,
+                },
+                Profile {
+                    id: SPANSION_PROFILE,
+                    name: "Spansion S29GL032M R4 · WR/MBC5 · 4 MiB",
+                    writable: true,
+                },
+            ]),
             Self::Nes | Self::Famicom => out.extend(BOARDS.iter().map(|b| Profile {
                 id: b.id,
                 name: b.name,
@@ -334,7 +341,7 @@ impl App {
             return "GBA uses INLretro, GBxCart RW or GB Operator at 3.3 V. Read, backup and verify ROM only; saved games are excluded. Size overrides are in Preferences.";
         }
         if self.effective_reader() == Kind::Gbxcart {
-            "GBxCart RW: ROM read, backup and verify. GB write/wipe requires the Ferrante 512 profile and PCB 6 / L14 firmware. Save memory is not supported."
+            "GBxCart RW: ROM read, backup and verify. GB write/wipe requires a matching Ferrante or Spansion profile and PCB 6 / L14 firmware. Save memory is not supported."
         } else if self.effective_reader() == Kind::Operator {
             "GB Operator: native GB / Color and GBA ROM detection, read, backup and verification. Close Playback before connecting. Save memory and ROM programming are not enabled."
         } else {
@@ -395,8 +402,10 @@ impl App {
             "GB Operator supports Game Boy / Color and Game Boy Advance ROM reading. Choose one of those cartridge families."
         } else if self.effective_reader() == Kind::Operator {
             "Operator write/wipe is disabled: the Ferrante 512 test did not erase and program correctly. Use the qualified GBxCart RW or INLretro profile for writing."
+        } else if self.profile.id == SPANSION_PROFILE && self.effective_reader() == Kind::Inlretro {
+            "This Spansion profile requires GBxCart RW PCB 6 / L14. Select GBxCart in Preferences."
         } else if self.platform == Platform::GameBoy && !self.writable() {
-            "Write/wipe: select Ferrante 512 only if it matches your cartridge. Automatic mode is read-only."
+            "Write/wipe: select the exact physical flash board. Automatic mode is read-only."
         } else if !self.writable() {
             "Write/wipe requires a supported flash board. Detect the board or select its exact profile."
         } else if !self.connected || self.no_device {
@@ -861,7 +870,7 @@ pub fn action_name(action: &str) -> &str {
 
 pub const SUPPORT: &str = r#"READERS
 INLretro: GB / Color, GBA, NES and Famicom. GBA ROM access is read-only.
-GBxCart RW: v1.3 / L1 supports qualified read-only GBA access. The v1.4 family with L12–L15 supports GB / Color and GBA reading; PCB 6 / L14 also supports Ferrante 512 write/wipe.
+GBxCart RW: v1.3 / L1 supports qualified read-only GBA access. The v1.4 family with L12–L15 supports GB / Color and GBA reading; PCB 6 / L14 supports Ferrante 512 write/wipe and experimental Spansion S29GL032M R4 write/wipe.
 GB Operator: qualified GB / Color and GBA ROM detection, read, backup and verification. Saved games and ROM programming are pending.
 Select a reader in Preferences, or use Automatic when exactly one candidate is connected.
 
@@ -955,6 +964,27 @@ mod tests {
         app.set_source(json!({"platform":"gameboy","path":"test.gb"}), None);
         assert_eq!(app.platform, Platform::Nes);
         assert!(app.status.contains("physical slot"));
+    }
+    #[test]
+    fn spansion_profile_is_shared_and_restricted_to_gbxcart() {
+        let root = tempfile::tempdir().unwrap();
+        let mut app = App::new(Some(root.path().into()), false);
+        app.connected = true;
+        let profile = app
+            .platform
+            .profiles()
+            .into_iter()
+            .find(|p| p.id == SPANSION_PROFILE)
+            .unwrap();
+        app.set_profile(profile).unwrap();
+        app.settings.reader = Kind::Gbxcart;
+        assert!(app.can("wipe"));
+        assert_eq!(app.request("wipe").profile, SPANSION_PROFILE);
+        for reader in [Kind::Inlretro, Kind::Operator] {
+            app.settings.reader = reader;
+            assert!(!app.can("wipe"));
+            assert!(!app.can("read"));
+        }
     }
     #[test]
     fn unknown_and_retail_boards_never_enable_destructive_actions() {

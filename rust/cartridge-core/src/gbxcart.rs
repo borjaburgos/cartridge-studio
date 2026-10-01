@@ -8,6 +8,7 @@ use std::{
 };
 mod flash;
 mod qualification;
+mod spansion;
 
 trait Wire: Read + Write {
     fn discard_input(&self) -> io::Result<()>;
@@ -31,6 +32,7 @@ pub struct Reader {
     mode: u8,
     read_retries: usize,
     flash_session: bool,
+    spansion_profile: bool,
     flash_verified: bool,
     program_ready: bool,
     erased: bool,
@@ -79,6 +81,7 @@ impl Reader {
             mode: 0,
             read_retries: 0,
             flash_session: false,
+            spansion_profile: false,
             flash_verified: false,
             program_ready: false,
             erased: false,
@@ -169,7 +172,7 @@ impl Reader {
         r.identity["capabilities"]["write"] = json!(writable);
         r.identity["capabilities"]["wipe"] = json!(writable);
         r.identity["capabilities"]["write_profiles"] = if writable {
-            json!([crate::rom::GB_PROFILE])
+            json!([crate::rom::GB_PROFILE, crate::rom::SPANSION_PROFILE])
         } else {
             json!([])
         };
@@ -337,8 +340,26 @@ impl Reader {
     }
 }
 impl gb::RomReader for Reader {
+    fn flash_capacity(&self) -> usize {
+        if self.spansion_profile {
+            crate::rom::SPANSION_CAPACITY
+        } else {
+            crate::rom::CAPACITY
+        }
+    }
+    fn flash_profile(&self) -> &'static str {
+        if self.spansion_profile {
+            crate::rom::SPANSION_PROFILE
+        } else {
+            crate::rom::GB_PROFILE
+        }
+    }
     fn initialize(&mut self) -> Result<()> {
-        self.initialize_gb_at_voltage(false)
+        if self.spansion_profile {
+            self.initialize_spansion_mbc5_readonly()
+        } else {
+            self.initialize_gb_at_voltage(false)
+        }
     }
     fn header_bytes(&mut self) -> Result<Vec<u8>> {
         self.read_range(0, 0x150)
@@ -376,10 +397,18 @@ impl gb::RomReader for Reader {
         self.control(&[command], false).map_err(|e| Error::new("READER_CLEANUP_FAILED", if self.power_control { "Cartridge power-off could not be confirmed." } else { "Cartridge bus release could not be confirmed." }, "Unplug USB before removing or changing the cartridge. Keep the completed reads and diagnostic report.").details(json!({"cause":e})))
     }
     fn identify_flash(&mut self) -> Result<Value> {
-        self.identify_sst()
+        if self.spansion_profile {
+            self.identify_spansion()
+        } else {
+            self.identify_sst()
+        }
     }
     fn enable_audio(&mut self) -> Result<()> {
-        self.configure_audio()
+        if self.spansion_profile {
+            self.configure_spansion()
+        } else {
+            self.configure_audio()
+        }
     }
 }
 impl gba::RomReader for Reader {
@@ -677,12 +706,12 @@ mod tests {
                         }
                         (1, 5 | 7 | 10) => assert_eq!(v, 0),
                         (1, 6) => {
-                            assert_eq!(v, 1);
-                            f.flash_bank1 = true;
+                            assert_eq!(v, usize::from(!f.spansion));
+                            f.flash_bank1 = v == 1;
                         }
                         (2, 1) => assert_eq!(v, 0),
                         (2, 2) => {
-                            assert!(v < 32);
+                            assert!(v < if f.spansion { 256 } else { 32 });
                             f.flash_target_bank = v;
                         }
                         (2, 5 | 6) => assert_eq!(v, 0x80),
@@ -730,6 +759,7 @@ mod tests {
                         if f.spansion {
                             response.fill(0);
                             response[..4].copy_from_slice(&[1, 1, 0x7e, 0x7e]);
+                            response[0x1c..0x1e].fill(0x1a);
                         } else {
                             assert_eq!((offset, f.size), (0, 2));
                             response = vec![0xbf, 0xb7];
@@ -741,7 +771,11 @@ mod tests {
                         response[0x22] = b'R';
                         response[0x24] = b'Y';
                         response[0x26] = 2;
-                        response[0x4e] = 22;
+                        response[0x4e] = if f.fault == "cfi" { 21 } else { 22 };
+                        response[0x58] = 2;
+                        for (n, v) in [7, 0, 0x20, 0, 0x3e, 0, 0, 1].iter().enumerate() {
+                            response[(0x2d + n) * 2] = *v;
+                        }
                     }
                     if f.size == 4096
                         && ((f.fault == "backup" && f.power_ons == 2)
@@ -789,7 +823,8 @@ mod tests {
                             f.flash_id_mode = true;
                         }
                         [(0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x90)] => f.flash_id_mode = true,
-                        [(0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x80), (0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x10)] =>
+                        [(0xaaa, 0xaa), (0x555, 0x55), (0xaaa, 0x80), (0xaaa, 0xaa), (0x555, 0x55), (0xaaa, 0x10)]
+                        | [(0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x80), (0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x10)] =>
                         {
                             assert!(f.power_ons >= 3, "erase before independent backups");
                             f.erases += 1;
@@ -804,7 +839,8 @@ mod tests {
                         _ => panic!("unexpected flash sequence {pairs:?}"),
                     }
                 }
-                [0xa7, 1, 1, 2, commands @ ..] => {
+                [0xa7, 1, 1, pin, commands @ ..] => {
+                    assert_eq!(*pin, if f.spansion { 1 } else { 2 });
                     let pairs: Vec<_> = commands
                         .as_chunks::<6>()
                         .0
@@ -818,27 +854,52 @@ mod tests {
                         .collect();
                     assert_eq!(
                         pairs,
-                        [
-                            (0x5555, 0xaa),
-                            (0x2aaa, 0x55),
-                            (0x5555, 0xa0),
-                            (0, 0),
-                            (0, 0),
-                            (0, 0)
-                        ]
+                        if f.spansion {
+                            [
+                                (0xaaa, 0xaa),
+                                (0x555, 0x55),
+                                (0xaaa, 0xa0),
+                                (0, 0),
+                                (0, 0),
+                                (0, 0),
+                            ]
+                        } else {
+                            [
+                                (0x5555, 0xaa),
+                                (0x2aaa, 0x55),
+                                (0x5555, 0xa0),
+                                (0, 0),
+                                (0, 0),
+                                (0, 0),
+                            ]
+                        }
                     );
                     f.flash_configured = true;
                 }
-                [0xb8, 0] => assert!(f.flash_configured && f.flash_bank1),
+                [0xb8, 0] => assert!(f.flash_configured && (f.flash_bank1 || f.spansion)),
                 [0xd3, payload @ ..] => {
                     assert!(
-                        f.flash_configured && f.flash_bank1 && f.flash_pin == 2 && f.erases == 1
+                        f.flash_configured
+                            && (f.flash_bank1 || f.spansion)
+                            && f.flash_pin == if f.spansion { 1 } else { 2 }
+                            && f.erases == 1
                     );
                     assert_eq!(payload.len(), f.size);
                     assert!(payload.len() <= 256);
                     let bank = f.flash_target_bank;
                     let address = f.address;
-                    assert!(address + payload.len() <= if bank == 0 { 0x4000 } else { 0x8000 });
+                    assert!(
+                        address + payload.len()
+                            <= if bank == 0 && !f.spansion {
+                                0x4000
+                            } else {
+                                0x8000
+                            }
+                    );
+                    if f.spansion {
+                        assert!(address >= 0x4000);
+                        assert_eq!(f.bank, bank);
+                    }
                     let offset = bank * 16384 + (address & 0x3fff);
                     f.programs += 1;
                     if f.fault != "program" {
@@ -953,6 +1014,89 @@ mod tests {
         assert!(!f.borrow().power);
         (result, f, temp)
     }
+    #[test]
+    fn spansion_full_capacity_write_wipe_and_failure_guards() {
+        for fault in [
+            "",
+            "wipe",
+            "id",
+            "cfi",
+            "backup",
+            "blank",
+            "program",
+            "program-ack",
+        ] {
+            let f = Rc::new(RefCell::new(Firmware {
+                spansion: true,
+                fault,
+                ..Default::default()
+            }));
+            let mut source = f.borrow().rom.clone();
+            source.resize(rom::SPANSION_CAPACITY, 0xff);
+            for bank in 0..256 {
+                source[bank * 16384 + 0x300] = bank as u8;
+            }
+            source[0x148] = 7;
+            source[0x14d] = source[0x134..0x14d]
+                .iter()
+                .fold(0u8, |a, b| a.wrapping_sub(*b).wrapping_sub(1));
+            source[0x14e..0x150].fill(0);
+            let sum = source.iter().fold(0u16, |a, b| a.wrapping_add(*b as u16));
+            source[0x14e..0x150].copy_from_slice(&sum.to_be_bytes());
+            f.borrow_mut().rom.resize(rom::SPANSION_CAPACITY, 0x42);
+            let before = f.borrow().rom.clone();
+            let r = Reader::connect(Box::new(Fake(f.clone())), "/dev/test", Cancel::default())
+                .unwrap()
+                .with_spansion_profile()
+                .unwrap();
+            let dir = tempfile::tempdir().unwrap();
+            let mut journal =
+                Journal::new(&dir.path().join("operation"), "gameboy", "write").unwrap();
+            let result = operations::gb_write_with(
+                Box::new(r),
+                &mut journal,
+                if fault == "wipe" { None } else { Some(&source) },
+                &mut |_| {},
+            );
+            if fault.is_empty() || fault == "wipe" {
+                let report = result.unwrap();
+                assert_eq!(report["backup_bytes"], rom::SPANSION_CAPACITY);
+                assert_eq!(report["blank_verified_bytes"], rom::SPANSION_CAPACITY);
+                assert_eq!(report["identical_final_reads"], true);
+                if fault.is_empty() {
+                    assert_eq!(f.borrow().rom, source);
+                    assert_eq!(report["banks_verified"], 256);
+                } else {
+                    assert!(f.borrow().rom.iter().all(|b| *b == 255));
+                }
+            } else {
+                let e = result.unwrap_err();
+                assert_eq!(
+                    e.code,
+                    match fault {
+                        "id" | "cfi" => "FLASH_NOT_IDENTIFIED",
+                        "backup" => "BACKUP_MISMATCH",
+                        "blank" => "BLANK_CHECK_FAILED",
+                        "program" => "BANK_VERIFY_FAILED",
+                        _ => "GBXCART_COMMAND_REJECTED",
+                    }
+                );
+                if ["id", "cfi", "backup"].contains(&fault) {
+                    assert_eq!(f.borrow().erases, 0);
+                    assert_eq!(f.borrow().rom, before);
+                }
+                if fault == "blank" {
+                    assert_eq!(f.borrow().programs, 0);
+                }
+                if fault == "program-ack" {
+                    assert_eq!(f.borrow().programs, 1);
+                }
+            }
+            assert!(!f.borrow().power);
+            assert!(!f.borrow().sent.iter().any(|p| p == &[0xa5]));
+        }
+    }
+
     #[test]
     fn spansion_queries_restore_rom_and_never_enable_programming() {
         for cancelled in [false, true] {

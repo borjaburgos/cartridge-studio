@@ -5,10 +5,10 @@ use crate::{gb::RomReader, operations::cleanup, rom};
 const UNLOCK: [(u16, u8); 2] = [(0x5555, 0xaa), (0x2aaa, 0x55)];
 
 impl Reader {
-    fn flash_hardware(&self) -> Result<()> {
+    pub(super) fn flash_hardware(&self) -> Result<()> {
         if self.identity["pcb"] != 6 || self.identity["firmware"] != "L14" {
             return Err(Error::new("GBXCART_FLASH_FIRMWARE_UNQUALIFIED",
-                "This GBxCart hardware/firmware has not been qualified for Ferrante 512 writing.",
+                "This GBxCart hardware/firmware has not been qualified for flash programming.",
                 "Use a GBxCart RW v1.4a/b/c (PCB 6) with L14 for this flash profile. Automatic ROM reading remains available. No firmware has been changed."));
         }
         Ok(())
@@ -26,7 +26,7 @@ impl Reader {
         }
         Ok(())
     }
-    fn flash_sequence(&mut self, sequence: &[(u16, u8)]) -> Result<()> {
+    pub(super) fn flash_sequence(&mut self, sequence: &[(u16, u8)]) -> Result<()> {
         if self.mode != 1 || !self.flash_session {
             return Err(Error::check("Flash bus is not initialized."));
         }
@@ -37,7 +37,7 @@ impl Reader {
         }
         self.ack(&cmd, true)
     }
-    fn reset_flash(&mut self) -> Result<()> {
+    pub(super) fn reset_flash(&mut self) -> Result<()> {
         // An ID query must exit software-ID mode even after cancellation.
         self.ack(&[0xd1, 0, 0, 0, 0, 0xf0], false)
     }
@@ -83,6 +83,9 @@ impl gb::FlashWriter for Reader {
         self.cancel.check()
     }
     fn prepare_program(&mut self) -> Result<()> {
+        if self.spansion_profile {
+            return self.prepare_spansion();
+        }
         if !self.flash_verified || self.mode != 1 {
             return Err(Error::check(
                 "Identify the flash chip before configuring programming.",
@@ -105,6 +108,9 @@ impl gb::FlashWriter for Reader {
         Ok(())
     }
     fn erase(&mut self) -> Result<()> {
+        if self.spansion_profile {
+            return self.erase_spansion();
+        }
         self.cancel.check()?;
         if !self.flash_verified || self.mode != 1 {
             return Err(Error::check(
@@ -135,6 +141,9 @@ impl gb::FlashWriter for Reader {
         }
     }
     fn program_bank(&mut self, bank: usize, data: &[u8]) -> Result<()> {
+        if self.spansion_profile {
+            return self.program_spansion_bank(bank, data);
+        }
         if self.mode != 1
             || !self.flash_verified
             || !self.program_ready

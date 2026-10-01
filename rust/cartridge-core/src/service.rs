@@ -118,10 +118,10 @@ fn check(data: &[u8], path: &Path, platform: &str, profile: &str, write: bool) -
             write,
         )?;
     } else if write {
-        if profile != GB_PROFILE {
-            return Err(Error::new("WRITE_PROFILE_REQUIRED","Automatic Game Boy detection supports reading only.","Select SST39SF040 AUDIO/MBC5 only if that is your physical board. Original retail cartridges cannot be rewritten."));
+        if !rom::gb_flash_profile(profile) {
+            return Err(Error::new("WRITE_PROFILE_REQUIRED","Automatic Game Boy detection supports reading only.","Select a supported flash profile only if it matches your physical board and reader. Original retail cartridges cannot be rewritten."));
         }
-        rom::validate_gb_flash(data)?;
+        rom::validate_gb_flash_profile(data, profile)?;
     }
     Ok(info)
 }
@@ -154,7 +154,7 @@ fn run_with_device(
     let action = r.action.as_str();
     if action == "profiles" {
         return Ok(
-            json!({"profiles":BOARDS,"gba_profiles":[{"id":"auto","name":"Game Boy Advance ROM · read-only","writable":false,"maximum_rom_bytes":crate::gba::MAX_SIZE}],"gameboy_profiles":[{"id":"auto","name":"Automatic · read/verify","writable":false},{"id":GB_PROFILE,"name":"Ferrante 512 · SST39SF040 AUDIO/MBC5","writable":true}],"version":crate::VERSION}),
+            json!({"profiles":BOARDS,"gba_profiles":[{"id":"auto","name":"Game Boy Advance ROM · read-only","writable":false,"maximum_rom_bytes":crate::gba::MAX_SIZE}],"gameboy_profiles":[{"id":"auto","name":"Automatic · read/verify","writable":false},{"id":GB_PROFILE,"name":"Ferrante 512 · SST39SF040 AUDIO/MBC5","writable":true},{"id":rom::SPANSION_PROFILE,"name":"Spansion S29GL032M R4 · WR/MBC5 · 4 MiB","writable":true,"qualification":"read-verified-programming-pending"}],"version":crate::VERSION}),
         );
     }
     if ["inspect", "game", "checksum"].contains(&action) {
@@ -213,7 +213,7 @@ fn run_with_device(
             rom::board(profile)?
         }
     } else {
-        if profile != "auto" && profile != GB_PROFILE {
+        if profile != "auto" && !rom::gb_flash_profile(profile) {
             return Err(Error::new("BOARD_PROFILE_REQUIRED","Choose a Game Boy cartridge profile.","Use automatic detection for reading, or the exact physical flash board for writing."));
         }
         BOARDS[0]
@@ -230,6 +230,7 @@ fn run_with_device(
     if action == "probe" {
         let bus = open(cancel)?;
         readers::check(bus.kind(), platform, profile, action)?;
+        let bus = bus.with_gameboy_profile(profile)?;
         let identity = bus.identity();
         let result = if platform == "gba" {
             let mut reader = bus.gba()?;
@@ -292,7 +293,7 @@ fn run_with_device(
     }
     let writing = action == "write" || action == "wipe";
     if writing {
-        if (platform == "gameboy" && profile != GB_PROFILE)
+        if (platform == "gameboy" && !rom::gb_flash_profile(profile))
             || (platform == "famicom" && !board.writable)
         {
             return Err(Error::new(
@@ -365,6 +366,7 @@ fn run_with_device(
     if let Err(e) = readers::check(bus.kind(), platform, profile, action) {
         return journal.finish(Err(e));
     }
+    let bus = bus.with_gameboy_profile(profile)?;
     journal.report["device"] = bus.identity();
     let mut report = if platform == "famicom" {
         operations::nes_operation(
@@ -394,7 +396,8 @@ fn run_with_device(
             bus.gameboy(),
             &mut journal,
             action,
-            profile == GB_PROFILE && ["backup", "verify"].contains(&action),
+            profile == rom::SPANSION_PROFILE
+                || (profile == GB_PROFILE && ["backup", "verify"].contains(&action)),
             data.as_deref(),
             if r.double_read { 2 } else { 1 },
             r.strict_checksum,

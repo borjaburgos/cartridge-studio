@@ -69,3 +69,23 @@ production write profile or GUI/TUI write capability is enabled by this result.
 
 These are interoperability references. The runtime remains native Rust and does
 not invoke or bundle FlashGBX.
+
+## Erase/program implementation
+
+The subsequent implementation uses normal AA/55 unlock commands, WR routing,
+3.3 V, unbuffered AMD byte programming and a 120-second chip-erase deadline.
+Only the exact R4 ID and observed CFI geometry are accepted. Programming addresses
+all banks through `0x4000–0x7FFF`, including bank zero after checking its alias;
+unlock commands remain in the fixed low window. GBxCart's forced-bank-1 option
+is disabled for this profile. The shared transaction now takes physical capacity
+from the reader instead of assuming 512 KiB.
+
+The retained game is MBC3-labelled with an invalid global checksum. The normal
+write path intentionally rejects that as a new compatible MBC5 source. The
+explicit development qualification can restore its pinned full-capacity backup
+exactly, without modifying the header or claiming MBC3/RTC support.
+
+Offline tests cover full-capacity writes/wipes and rejection before erase for
+ID, CFI and backup failures, plus blank verification and programming failures.
+Physical erase/program qualification remains pending an explicitly authorized
+hardware test; no physical erase/program result is claimed.

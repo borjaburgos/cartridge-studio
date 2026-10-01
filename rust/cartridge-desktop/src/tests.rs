@@ -29,7 +29,7 @@ fn gbxcart_flash_controls_explain_profile_and_source_requirements() {
     drop(ui);
     desktop
         .app
-        .set_profile(Platform::GameBoy.profiles()[1])
+        .set_profile(Platform::GameBoy.profiles()[2])
         .unwrap();
     assert!(desktop.app.can("wipe"));
     assert!(!desktop.app.can("write"));
@@ -48,7 +48,7 @@ fn gbxcart_flash_controls_explain_profile_and_source_requirements() {
         .snapshot(&desktop.theme())
         .unwrap()
         .matches_image(out.join(format!(
-            "gbxcart-write-v{}-1000-700",
+            "gbxcart-spansion-write-v{}-1000-700",
             env!("CARGO_PKG_VERSION").replace('.', "-")
         )))
         .unwrap());

@@ -49,12 +49,17 @@ pub fn check(kind: Kind, platform: &str, profile: &str, action: &str) -> Result<
     {
         return Err(Error::new("GBA_OPERATION_UNSUPPORTED", "GBA supports ROM detection, reading, backup and verification through INLretro, GBxCart RW and GB Operator.", "Choose a supported reader and the Automatic profile. GBA ROM writing, erasing and save-memory access are not supported."));
     }
+    if profile == crate::rom::SPANSION_PROFILE && !matches!(kind, Kind::Auto | Kind::Gbxcart) {
+        return Err(unsupported(
+            "S29GL032M programming/read access; choose GBxCart PCB 6 / L14",
+        ));
+    }
     if kind == Kind::Gbxcart && action != "doctor" {
         let read = ["gameboy", "gba"].contains(&platform)
             && profile == "auto"
             && ["probe", "read", "backup", "verify"].contains(&action);
         let flash = platform == "gameboy"
-            && profile == crate::rom::GB_PROFILE
+            && crate::rom::gb_flash_profile(profile)
             && [
                 "probe", "read", "backup", "verify", "check", "write", "wipe",
             ]
@@ -82,6 +87,15 @@ pub enum Device {
     Operator(operator::Reader),
 }
 impl Device {
+    pub fn with_gameboy_profile(self, profile: &str) -> Result<Self> {
+        if profile != crate::rom::SPANSION_PROFILE {
+            return Ok(self);
+        }
+        match self {
+            Self::Gbxcart(r) => Ok(Self::Gbxcart(r.with_spansion_profile()?)),
+            _ => Err(unsupported("S29GL032M access on this reader")),
+        }
+    }
     pub fn kind(&self) -> Kind {
         match self {
             Self::Inlretro(_) => Kind::Inlretro,
@@ -204,13 +218,18 @@ mod tests {
     #[test]
     fn capabilities_allow_only_the_supported_gb_flash_profile() {
         for slot in ["gameboy", "gba", "nes", "famicom"] {
-            for profile in ["auto", crate::rom::GB_PROFILE, "broke-unrom512"] {
+            for profile in [
+                "auto",
+                crate::rom::GB_PROFILE,
+                crate::rom::SPANSION_PROFILE,
+                "broke-unrom512",
+            ] {
                 for action in [
                     "probe", "read", "backup", "verify", "write", "wipe", "check",
                 ] {
                     assert_eq!(
                         check(Kind::Gbxcart, slot, profile, action).is_ok(),
-                        (slot == "gameboy" && profile == crate::rom::GB_PROFILE)
+                        (slot == "gameboy" && crate::rom::gb_flash_profile(profile))
                             || (["gameboy", "gba"].contains(&slot)
                                 && profile == "auto"
                                 && ["probe", "read", "backup", "verify"].contains(&action))
@@ -221,7 +240,12 @@ mod tests {
     }
     #[test]
     fn inlretro_allows_only_read_only_gba_operations() {
-        for profile in ["auto", crate::rom::GB_PROFILE, "broke-unrom512"] {
+        for profile in [
+            "auto",
+            crate::rom::GB_PROFILE,
+            crate::rom::SPANSION_PROFILE,
+            "broke-unrom512",
+        ] {
             for action in [
                 "probe", "read", "backup", "verify", "write", "wipe", "check",
             ] {
@@ -235,7 +259,12 @@ mod tests {
     #[test]
     fn operator_allows_only_read_only_automatic_gameboy_and_gba_operations() {
         for slot in ["gameboy", "gba", "nes", "famicom"] {
-            for profile in ["auto", crate::rom::GB_PROFILE, "broke-unrom512"] {
+            for profile in [
+                "auto",
+                crate::rom::GB_PROFILE,
+                crate::rom::SPANSION_PROFILE,
+                "broke-unrom512",
+            ] {
                 for action in [
                     "probe", "read", "backup", "verify", "write", "wipe", "check",
                 ] {

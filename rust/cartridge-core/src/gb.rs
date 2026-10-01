@@ -114,6 +114,12 @@ impl Drop for Reader {
 
 /// Cartridge-level reading interface. Reader protocols stay behind this boundary.
 pub trait RomReader {
+    fn flash_capacity(&self) -> usize {
+        rom::CAPACITY
+    }
+    fn flash_profile(&self) -> &'static str {
+        rom::GB_PROFILE
+    }
     fn initialize(&mut self) -> Result<()>;
     fn header_bytes(&mut self) -> Result<Vec<u8>>;
     fn set_mapper(&mut self, mapper: String);
@@ -129,6 +135,9 @@ pub trait RomReader {
 }
 /// Board-specific programming beneath the shared durable transaction.
 pub trait FlashWriter: RomReader {
+    fn validate_program_source(&self, data: &[u8]) -> Result<Value> {
+        rom::validate_gb_flash_profile(data, self.flash_profile())
+    }
     fn check_cancel(&self) -> Result<()>;
     fn prepare_program(&mut self) -> Result<()>;
     fn erase(&mut self) -> Result<()>;

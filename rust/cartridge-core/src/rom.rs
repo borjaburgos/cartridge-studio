@@ -4,6 +4,36 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 pub const GB_PROFILE: &str = "sst39sf040-audio-mbc5";
 pub const CAPACITY: usize = 524288;
+pub const SPANSION_PROFILE: &str = "s29gl032m-r4-wr-mbc5";
+pub const SPANSION_CAPACITY: usize = 4 * 1024 * 1024;
+pub fn gb_flash_profile(profile: &str) -> bool {
+    matches!(profile, GB_PROFILE | SPANSION_PROFILE)
+}
+pub fn validate_gb_flash_profile(data: &[u8], profile: &str) -> Result<Value> {
+    if profile == GB_PROFILE {
+        return validate_gb_flash(data);
+    }
+    if profile != SPANSION_PROFILE {
+        return Err(Error::check("Select an exact supported flash board."));
+    }
+    let i = gb_checks(data)?;
+    validate_gb(&i)?;
+    let cart_type = i["cartridge_type"].as_u64().unwrap_or(255);
+    let ram = i["ram_size_code"].as_u64().unwrap_or(255);
+    if ["size_valid", "global_checksum_valid"]
+        .iter()
+        .any(|k| i[k] != true)
+        || !matches!(cart_type, 0x19..=0x1b)
+        || (cart_type == 0x19 && ram != 0)
+        || (cart_type != 0x19 && !matches!(ram, 2 | 3))
+        || data.len() > SPANSION_CAPACITY
+    {
+        return Err(Error::new("ROM_INCOMPATIBLE",
+            "This ROM does not match the S29GL032M R4 / MBC5 board.",
+            "Use an MBC5 ROM (type 0x19–0x1B), at most 4 MiB, with no RAM or 8/32 KiB RAM and valid size/header/global checksums. MBC3/RTC, rumble and larger saves are unsupported. Nothing has been erased."));
+    }
+    Ok(i)
+}
 pub const LOGO: [u8; 48] = [
     0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0, 0x0b, 3, 0x73, 0, 0x83, 0, 0x0c, 0, 0x0d, 0, 8, 0x11,
     0x1f, 0x88, 0x89, 0, 0x0e, 0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99, 0xbb, 0xbb, 0x67,
