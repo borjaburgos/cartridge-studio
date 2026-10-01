@@ -7,7 +7,7 @@ homebrew to explicitly supported flash boards. Choose a graphical desktop, an
 interactive terminal or a command line, all powered by the same native Rust core.
 
 [Website](https://borjaburgos.github.io/cartridge-studio/) ·
-[Download the first beta](https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.1) ·
+[Download the beta](https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.3) ·
 [Supported hardware](docs/support.md) · [Roadmap](docs/roadmap.md) ·
 [Contribute](https://github.com/borjaburgos/cartridge-studio/blob/main/CONTRIBUTING.md)
 
@@ -38,10 +38,10 @@ results, automate work and help expand the supported hardware.
 - **Useful offline.** Reading, verification, game identification and local
   history work without an account or network. Artwork is optional.
 
-## First public beta
+## Current beta
 
-**0.1.0-beta.1 is an early testing release.** Hardware coverage is deliberately
-limited, and native Rust write/wipe still needs physical qualification. Keep
+**0.1.0-beta.3 is an early testing release.** Hardware coverage is deliberately
+limited. Spansion S29GL032M R4 erase/program is physically verified on GBxCart PCB 6 / L14. Keep
 verified backups and check the support table before using a cartridge. Report
 problems through the issue templates; macOS and Windows packages are not available.
 
@@ -59,7 +59,7 @@ The GUI uses native operating-system windows and Rust-rendered Iced controls.
 | Reader | Read, back up and verify | Write and wipe |
 | --- | --- | --- |
 | INLretro | GB / Color; standard linear GBA ROMs; supported NES and Famicom boards | SST39SF040 AUDIO/MBC5 and UNROM-512 profiles |
-| GBxCart RW | GB / Color and GBA on supported v1.4-family firmware; GBA only on supported v1.3 firmware | Ferrante 512 on PCB 6 / L14 only |
+| GBxCart RW | GB / Color and GBA on supported v1.4-family firmware; GBA only on supported v1.3 firmware | Ferrante 512 and Spansion S29GL032M R4 on PCB 6 / L14 |
 | Epilogue GB Operator | GB / Color and standard linear GBA ROMs | Not implemented |
 
 Supported GB reading covers ROM-only, MBC1, MBC2, MBC3 and MBC5. NES/Famicom
@@ -67,8 +67,8 @@ support covers UNROM-512 / mapper 30 and manual NROM-128 / NROM-256 profiles.
 NES and Famicom have separate physical slot selections. GBA is read-only, up to
 32 MiB. This is **not blanket support for every game or cartridge** on a platform.
 
-Native write/wipe workflows are implemented and tested with simulated devices;
-physical Rust erase/program qualification remains pending. INLretro GBA and
+Spansion erase/program passed full-capacity physical testing and exact restoration.
+Other profiles retain their documented qualification limits. INLretro GBA and
 NROM hardware qualification are also pending. See the [complete support matrix](docs/support.md)
 and [recorded reader qualification](docs/readers.md) before choosing hardware.
 Save-memory backup/restore, RTC, Camera photos and SD-card cartridges are not
@@ -78,7 +78,7 @@ or a writable board.
 ## Get started
 
 Download the Linux archive and `SHA256SUMS` from the
-[0.1.0-beta.1 release](https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.1).
+[0.1.0-beta.3 release](https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.3).
 Check the archive checksum, extract it, then run its installer:
 
 ```sh

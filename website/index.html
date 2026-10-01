@@ -179,7 +179,7 @@
         >
           <table>
             <caption>
-              Reader compatibility in Cartridge Studio 0.1.0-beta.1
+              Reader compatibility in Cartridge Studio 0.1.0-beta.3
             </caption>
             <thead>
               <tr>
@@ -202,7 +202,7 @@
                   >
                 </td>
                 <td>
-                  Ferrante 512<br /><small>PCB 6 / L14 firmware only*</small>
+                  Ferrante 512 &amp; Spansion 4 MiB<br /><small>PCB 6 / L14 firmware only*</small>
                 </td>
               </tr>
               <tr>
@@ -215,10 +215,10 @@
         </div>
         <p class="support-note">
           * Implementation and physical qualification are distinct. INLretro GBA
-          and native Rust programming need further hardware qualification.
-          Manual NROM reads also await physical qualification. GBxCart writing
-          is restricted to the exact Ferrante profile and PCB/firmware
-          combination.
+          and manual NROM reads await hardware qualification. Spansion S29GL032M R4
+          erase/program is physically verified across all 4 MiB on GBxCart PCB 6 / L14.
+          Other flash profiles retain their documented qualification limits;
+          exact board and firmware matching is required.
         </p>
         <p>
           <a
@@ -368,7 +368,7 @@
         <p class="eyebrow">BRING YOUR CARTRIDGES</p>
         <h2>Your next backup<br />starts here.</h2>
         <p class="section-intro">
-          First public beta · <strong>0.1.0-beta.1</strong> · Choose GUI, TUI,
+          Linux beta · <strong>0.1.0-beta.3</strong> · Choose GUI, TUI,
           CLI—or all three—during installation.
         </p>
         <div class="download-grid">
@@ -381,17 +381,17 @@
             <a
               class="button primary"
               data-download="portable"
-              href="https://github.com/borjaburgos/cartridge-studio/releases/download/v0.1.0-beta.1/cartridge-studio-0.1.0-beta.1-linux-x86_64.tar.gz"
+              href="https://github.com/borjaburgos/cartridge-studio/releases/download/v0.1.0-beta.3/cartridge-studio-0.1.0-beta.3-linux-x86_64.tar.gz"
               >Download Linux beta <span aria-hidden="true">↓</span></a
             >
             <div class="download-links">
               <a
                 data-download="release"
-                href="https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.1"
+                href="https://github.com/borjaburgos/cartridge-studio/releases/tag/v0.1.0-beta.3"
                 >Arch packages &amp; release notes</a
               ><a
                 data-download="checksums"
-                href="https://github.com/borjaburgos/cartridge-studio/releases/download/v0.1.0-beta.1/SHA256SUMS"
+                href="https://github.com/borjaburgos/cartridge-studio/releases/download/v0.1.0-beta.3/SHA256SUMS"
                 >SHA-256 checksums</a
               >
             </div>

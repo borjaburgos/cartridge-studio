@@ -13,12 +13,12 @@ The detailed evidence and hashes are in [Reader support](readers.md).
 | --- | --- | --- | --- | --- |
 | INLretro | Read, backup, verify | Read, backup, verify; physical qualification pending | Supported profiles only, distinct 72-pin and 60-pin slot selections | Supported GB and UNROM-512 profiles; physical Rust qualification pending |
 | GBxCart RW v1.3, PCB 4, R1–R30 or L1 | Blocked pending voltage-path qualification | Read, backup, verify; physically qualified on L1 | Unsupported | Unsupported |
-| GBxCart RW v1.4-family, PCB 5/6, L12–L15 | Read, backup, verify | Read, backup, verify | Unsupported | Ferrante 512 only on PCB 6 / L14; physical Rust qualification pending |
+| GBxCart RW v1.4-family, PCB 5/6, L12–L15 | Read, backup, verify | Read, backup, verify | Unsupported | Ferrante 512 and Spansion R4 on PCB 6 / L14; Spansion physically qualified |
 | Epilogue GB Operator | Read, backup, verify | Read, backup, verify | Unsupported | Unsupported |
 
 GBxCart physical read qualification covers PCB 6 / L14 and PCB 4 / L1; accepting
 other listed protocol revisions does not mean they have all been physically
-tested. GB Operator read qualification covers device version 1.11. The software
+tested. GB Operator read qualification includes legacy device version 1.11 and firmware 10.0.10 / core 2.0.0 streaming reads. The software
 does not update any reader's firmware automatically.
 
 ## Cartridge profiles
@@ -27,6 +27,7 @@ does not update any reader's firmware automatically.
 | --- | --- | --- |
 | GB / GBC automatic | ROM-only up to 32 KiB; MBC1/MBC3 up to 2 MiB; MBC2 up to 256 KiB; MBC5 up to 8 MiB | Two matching validated headers; reads ROM only. Header mapper/size does not establish flash wiring. Specialized mapper variants and peripherals are not qualified. |
 | GB `sst39sf040-audio-mbc5` | Ferrante 512 / SST39SF040 AUDIO/MBC5, 5 V, 512 KiB | Explicit manual board selection. Flash ID BF B7; MBC5 type `0x19` ROM without save RAM, exact declared size and valid checksums. INLretro or GBxCart PCB 6 / L14. |
+| GB `s29gl032m-r4-wr-mbc5` | Spansion S29GL032M R4, normal data wiring, WR/MBC5, 3.3 V, 4 MiB | GBxCart PCB 6 / L14 only; exact ID/CFI and bank mapping checks. MBC5 types `0x19–0x1B`, no RAM or 8/32 KiB RAM, valid size and checksums. No MBC3/RTC or rumble. Save RAM is not accessed. Physically qualified. |
 | NES / Famicom `broke-unrom512` | Broke Studio UNROM-512 v2.1 interface, mapper 30, 512 KiB flash, 32 KiB CHR RAM | Hardware detection of flash, banks and mirroring; does not prove manufacturer/revision. Write requires matching memory and mirroring; no separate PRG RAM, CHR ROM or trainer. |
 | NES / Famicom `nrom-128` | Mapper 0, 16 KiB PRG ROM, 8 KiB CHR ROM | Manual known-board selection, read/backup/verify only. Physical qualification pending. |
 | NES / Famicom `nrom-256` | Mapper 0, 32 KiB PRG ROM, 8 KiB CHR ROM | Manual known-board selection, read/backup/verify only. Physical qualification pending. |
@@ -62,8 +63,9 @@ authenticity, PCB model or safe write wiring.
 “Implemented” means the software path exists. “Physically qualified” means a
 specified reader, firmware and cartridge completed recorded hardware tests.
 Simulated protocol tests do not replace that evidence. The native Rust write/wipe
-paths have simulations and safety checks, but physical erase/program qualification
-is still outstanding; earlier implementation tests are retained as historical evidence.
+paths have simulations and safety checks. Spansion R4 on GBxCart PCB 6 / L14
+has completed full-capacity erase/program and exact-restoration qualification.
+Other profiles retain their separately documented physical-test limits.
 
 Verified native reads include INLretro MBC1, GBxCart PCB 6 / L14 MBC5 and GBA,
 GBxCart PCB 4 / L1 GBA, and GB Operator GB and GBA. Known retail dumps match
@@ -91,11 +93,10 @@ slot/profile, action and the error code/report. Redact personal paths and device
 serial numbers. Do not attach commercial ROMs, BIOS files or private saves. Use
 the [bug or hardware request forms](https://github.com/borjaburgos/cartridge-studio/issues/new/choose).
 
-## Unreleased Spansion profile
+## Spansion physical qualification
 
-The current development checkout adds `s29gl032m-r4-wr-mbc5` for the confirmed
+Beta.3 includes `s29gl032m-r4-wr-mbc5` for the confirmed
 4 MiB / 3.3 V / normal-data-wiring board on GBxCart PCB 6 / L14. Read/identification and
 full-capacity erase/program have passed physical qualification, including
-per-bank verification and two power-cycled 4 MiB readbacks. It is not part of the
-published beta's support matrix above. See [reader instructions](readers.md#spansion-s29gl032m-r4-unreleased)
+per-bank verification and two power-cycled 4 MiB readbacks. See [reader instructions](readers.md#spansion-s29gl032m-r4)
 and [the board investigation](spansion-board-investigation.md).

@@ -22,7 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION = tomllib.loads((ROOT/'Cargo.toml').read_text())['workspace']['package']['version']
 PROGRAMS = ('cartridge-studio', 'cartridge-tui', 'cartridge', 'cartridge-worker')
 DOCUMENTS = ('install.md', 'support.md', 'roadmap.md', 'readers.md', 'desktop.md',
-    'tui.md', 'detection.md', 'games.md', 'release-notes.md', 'third-party.md')
+    'tui.md', 'detection.md', 'games.md', 'release-notes.md', 'third-party.md',
+    'spansion-board-investigation.md', 'operator-programming.md')
 # These are the desktop integration libraries loaded by winit/softbuffer, not
 # an application runtime. Bundle their dependency closure except the OS libc.
 LINUX_LIBRARIES = ('libgcc_s.so.1', 'libwayland-client.so.0', 'libwayland-cursor.so.0',

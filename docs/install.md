@@ -1,6 +1,6 @@
 # Install Cartridge Studio
 
-The first public beta, **0.1.0-beta.1**, ships for **Linux x86-64**, qualified
+The current beta, **0.1.0-beta.3**, ships for **Linux x86-64**, qualified
 on Arch Linux / Omarchy. This is a testing release with limited hardware coverage;
 check [supported configurations](support.md) before using a cartridge.
 macOS and Windows packages are planned and are not available yet. Obtain release
@@ -41,7 +41,7 @@ implementation and offline catalog. No Python, GTK, libusb installation, browser
 or compiler is needed at runtime. The host provides Linux, compatible glibc,
 device access and a Wayland/X11 session for the GUI. The archive's
 `runtime-requirements.json` records the build's glibc requirement: **2.43 or newer**
-for version 0.1.0-beta.1. Current Arch
+for version 0.1.0-beta.3. Current Arch
 builds are not claimed to run on older-glibc distributions. The TUI and CLI do
 not require a graphical session.
 

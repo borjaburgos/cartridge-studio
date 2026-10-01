@@ -8,7 +8,7 @@ selection is separate from the physical cartridge slot and board profile.
 | Reader | Supported operations | Current limits |
 | --- | --- | --- |
 | INLretro | GB / Color, GBA and NES / Famicom detect, read, backup and verify; supported GB and Famicom flash-board write/wipe paths | GBA is read-only at 3.3 V and physical INLretro GBA qualification is pending; writing requires an explicitly supported flash board; physical Rust write qualification remains pending |
-| GBxCart RW | GB / Color and GBA ROM detect, read, backup and verify; Ferrante 512 write/wipe on PCB 6 / L14 | v1.3 PCB 4 / L1 is qualified for read-only GBA. v1.4-family L12–L15 reads GB / Color and GBA. No GBA writing, save RAM or RTC |
+| GBxCart RW | GB / Color and GBA ROM detect, read, backup and verify; Ferrante 512 and Spansion R4 write/wipe on PCB 6 / L14 | v1.3 PCB 4 / L1 is qualified for read-only GBA. v1.4-family L12–L15 reads GB / Color and GBA. No GBA writing, save RAM or RTC |
 | Epilogue GB Operator | GB / Color and GBA ROM detect, read, backup and verify | Native bulk USB; save memory, RTC and cartridge programming are pending |
 
 The GBxCart driver accepts PCB 4 (v1.3) with legacy R1–R30 or extended L1 for
@@ -296,9 +296,9 @@ The Ferrante board commands are checked against the upstream
 GBxCart uses firmware A7 configuration, D4 flash sequences and D3 byte programming;
 normal mapper writes stay on B2. No upstream host implementation is bundled.
 
-## Spansion S29GL032M R4 (unreleased)
+## Spansion S29GL032M R4
 
-The checkout adds **Spansion S29GL032M R4 · WR/MBC5 · 4 MiB** to the shared
+Beta.3 adds **Spansion S29GL032M R4 · WR/MBC5 · 4 MiB** to the shared
 GUI/TUI/CLI profile list. It requires GBxCart PCB 6 / L14 and the physically
 confirmed board described in [the investigation](spansion-board-investigation.md).
 This is not a generic S29GL032M profile: other revisions, swapped data wiring,
