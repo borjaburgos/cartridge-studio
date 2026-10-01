@@ -57,9 +57,8 @@ any identification query. Keep that capture separate from the verified backups;
 it is not evidence of an erased chip. The successful reseated run does not prove
 the exact cause of the earlier connection failure.
 
-This qualifies the observed read and identification procedure only. SRAM was
-not accessed or backed up, and erase/program behavior remains untested. No new
-production write profile or GUI/TUI write capability is enabled by this result.
+That initial run qualified read and identification only. SRAM was not accessed
+or backed up. The subsequent erase/program qualification is recorded below.
 
 ## References
 
@@ -87,5 +86,35 @@ exactly, without modifying the header or claiming MBC3/RTC support.
 
 Offline tests cover full-capacity writes/wipes and rejection before erase for
 ID, CFI and backup failures, plus blank verification and programming failures.
-Physical erase/program qualification remains pending an explicitly authorized
-hardware test; no physical erase/program result is claimed.
+The first authorized hardware run erased and blank-checked all 4 MiB, then
+programmed and verified 145 banks. The next bank read timed out with 4,089 of
+4,096 requested bytes received. The transaction failed without reporting success;
+its original full-capacity backups match the earlier read-only backups. Evidence
+is retained in `program-qualification/pattern/report.json` under the investigation
+directory. Erase/program replies were not retried.
+
+Spansion ROM reads now use paced 1 KiB bursts to reduce pressure on the CH340
+serial bridge, matching the existing GBA read envelope. An incomplete response
+still stops the operation. The partial first run is not a passing qualification.
+
+## Completed paced-read qualification
+
+The rerun completed on GBxCart PCB 6 / L14 at 3.3 V, using 1 KiB ROM reads
+with a 1 ms pause between requests. Both the synthetic-pattern transaction and
+original-content restoration completed successfully. Each retained two matching
+full-capacity backups, blank-checked all 4 MiB after erase, verified all 256 banks,
+and compared two power-cycled final 4 MiB readbacks.
+
+The pattern includes unique data across every bank, both halves and bank ends.
+Its final SHA-256 is
+`6bb0c2abcb82fb8ad79e15f649033936c70e78f8f532baf77a1e7b7df8a9615c`.
+The restored cartridge's SHA-256 is
+`59f4fc8ccf087df64c31912b09cf2ca771b5dcd11e156e4f94672cf4fd18457f`,
+identical to the original backup. The original header and incorrect global
+checksum were preserved exactly; SRAM was never accessed.
+
+Reports and raw evidence are under `program-qualification-paced/` in the
+investigation directory, with an aggregate `qualification-summary.json`.
+The GUI/TUI/CLI profile `s29gl032m-r4-wr-mbc5` is now physically qualified for
+this exact normal-data-wiring R4 board and reader/firmware combination. This does
+not qualify different board wiring, flash revisions, save memory, or other readers.

@@ -94,8 +94,8 @@ the [bug or hardware request forms](https://github.com/borjaburgos/cartridge-stu
 ## Unreleased Spansion profile
 
 The current development checkout adds `s29gl032m-r4-wr-mbc5` for the confirmed
-4 MiB / 3.3 V / normal-data-wiring board on GBxCart PCB 6 / L14. Read and
-identification are physically verified; erase/program is implemented with
-simulated tests and awaits physical qualification. It is not part of the
+4 MiB / 3.3 V / normal-data-wiring board on GBxCart PCB 6 / L14. Read/identification and
+full-capacity erase/program have passed physical qualification, including
+per-bank verification and two power-cycled 4 MiB readbacks. It is not part of the
 published beta's support matrix above. See [reader instructions](readers.md#spansion-s29gl032m-r4-unreleased)
 and [the board investigation](spansion-board-investigation.md).

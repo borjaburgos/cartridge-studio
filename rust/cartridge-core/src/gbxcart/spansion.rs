@@ -1,5 +1,5 @@
 //! Exact S29GL032M R4 profile, normal data wiring, WR/MBC5 at 3.3 V.
-//! Read identification is physically verified; programming qualification is pending.
+//! Physically verified with a full-capacity pattern and two power-cycled readbacks.
 use super::*;
 use crate::rom;
 const UNLOCK: [(u16, u8); 2] = [(0xaaa, 0xaa), (0x555, 0x55)];

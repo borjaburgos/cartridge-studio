@@ -280,7 +280,12 @@ impl Reader {
         }
         let mut out = Vec::with_capacity(length);
         while out.len() < length {
-            let size = (length - out.len()).min(4096);
+            // A sustained Spansion readback returned a short 4 KiB reply. Use the paced 1 KiB envelope already
+            // proven by the GBA transport; never pad an incomplete response.
+            let size = (length - out.len()).min(if self.spansion_profile { 1024 } else { 4096 });
+            if self.spansion_profile {
+                std::thread::sleep(Duration::from_millis(1));
+            }
             self.variable(1, 1, 1)?; // DMG_ACCESS_MODE = ROM read
             self.variable(2, 0, size as u32)?;
             self.variable(4, 0, address as u32 + out.len() as u32)?;
@@ -777,7 +782,7 @@ mod tests {
                             response[(0x2d + n) * 2] = *v;
                         }
                     }
-                    if f.size == 4096
+                    if f.size == if f.spansion { 1024 } else { 4096 }
                         && ((f.fault == "backup" && f.power_ons == 2)
                             || (f.fault == "final" && f.power_ons == 5))
                     {

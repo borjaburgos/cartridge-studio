@@ -154,7 +154,7 @@ fn run_with_device(
     let action = r.action.as_str();
     if action == "profiles" {
         return Ok(
-            json!({"profiles":BOARDS,"gba_profiles":[{"id":"auto","name":"Game Boy Advance ROM · read-only","writable":false,"maximum_rom_bytes":crate::gba::MAX_SIZE}],"gameboy_profiles":[{"id":"auto","name":"Automatic · read/verify","writable":false},{"id":GB_PROFILE,"name":"Ferrante 512 · SST39SF040 AUDIO/MBC5","writable":true},{"id":rom::SPANSION_PROFILE,"name":"Spansion S29GL032M R4 · WR/MBC5 · 4 MiB","writable":true,"qualification":"read-verified-programming-pending"}],"version":crate::VERSION}),
+            json!({"profiles":BOARDS,"gba_profiles":[{"id":"auto","name":"Game Boy Advance ROM · read-only","writable":false,"maximum_rom_bytes":crate::gba::MAX_SIZE}],"gameboy_profiles":[{"id":"auto","name":"Automatic · read/verify","writable":false},{"id":GB_PROFILE,"name":"Ferrante 512 · SST39SF040 AUDIO/MBC5","writable":true},{"id":rom::SPANSION_PROFILE,"name":"Spansion S29GL032M R4 · WR/MBC5 · 4 MiB","writable":true,"qualification":"read-erase-program-verified-pcb6-l14"}],"version":crate::VERSION}),
         );
     }
     if ["inspect", "game", "checksum"].contains(&action) {

@@ -870,7 +870,7 @@ pub fn action_name(action: &str) -> &str {
 
 pub const SUPPORT: &str = r#"READERS
 INLretro: GB / Color, GBA, NES and Famicom. GBA ROM access is read-only.
-GBxCart RW: v1.3 / L1 supports qualified read-only GBA access. The v1.4 family with L12–L15 supports GB / Color and GBA reading; PCB 6 / L14 supports Ferrante 512 write/wipe and experimental Spansion S29GL032M R4 write/wipe.
+GBxCart RW: v1.3 / L1 supports qualified read-only GBA access. The v1.4 family with L12–L15 supports GB / Color and GBA reading; PCB 6 / L14 supports Ferrante 512 write/wipe and Spansion S29GL032M R4 write/wipe.
 GB Operator: qualified GB / Color and GBA ROM detection, read, backup and verification. Saved games and ROM programming are pending.
 Select a reader in Preferences, or use Automatic when exactly one candidate is connected.
 

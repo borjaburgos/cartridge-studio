@@ -302,8 +302,9 @@ The checkout adds **Spansion S29GL032M R4 · WR/MBC5 · 4 MiB** to the shared
 GUI/TUI/CLI profile list. It requires GBxCart PCB 6 / L14 and the physically
 confirmed board described in [the investigation](spansion-board-investigation.md).
 This is not a generic S29GL032M profile: other revisions, swapped data wiring,
-and other readers are rejected. Physical erase/program validation is pending;
-read/identification has been physically verified.
+and other readers are rejected. Physical testing on PCB 6 / L14 erased and
+blank-checked all 4 MiB, programmed a distinct pattern across all 256 banks,
+and matched it in two power-cycled full-capacity readbacks.
 
 The reader selects 3.3 V before powering the cartridge. Every destructive
 transaction requires responding ID `01 7E 1A 00`, the matching CFI command set
