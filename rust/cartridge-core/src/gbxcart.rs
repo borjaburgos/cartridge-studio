@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 mod flash;
+mod qualification;
 
 trait Wire: Read + Write {
     fn discard_input(&self) -> io::Result<()>;
@@ -284,21 +285,11 @@ impl Reader {
         }
         Ok(out)
     }
-    fn bank_write(&mut self, address: u16, value: u8) -> Result<()> {
-        if self.mode != 1
-            || self.mapper.is_none()
-            || ![0x2000, 0x2100, 0x3000, 0x4000, 0x6000].contains(&address)
-        {
-            return Err(Error::check("Disallowed Game Boy bank register write."));
-        }
-        let mut cmd = vec![0xb2];
-        cmd.extend((address as u32).to_be_bytes());
-        cmd.push(value);
-        self.ack(&cmd, true)
-    }
-}
-impl gb::RomReader for Reader {
-    fn initialize(&mut self) -> Result<()> {
+    fn initialize_gb_at_voltage(&mut self, use_3v3: bool) -> Result<()> {
+        self.identity
+            .as_object_mut()
+            .unwrap()
+            .remove("diagnostic_voltage");
         if self.identity["pcb"] == 4 {
             return Err(Error::new(
                 "GBXCART_V13_GB_UNSUPPORTED",
@@ -317,7 +308,7 @@ impl gb::RomReader for Reader {
             std::thread::sleep(Duration::from_millis(200));
         }
         self.ack(&[0xa3], true)?;
-        self.ack(&[0xa5], true)?;
+        self.ack(&[if use_3v3 { 0xa4 } else { 0xa5 }], true)?;
         self.variable(1, 0x0b, 1)?; // GBxCart standard A15 ROM read method.
         self.variable(1, 0, 1)?;
         self.variable(1, 8, 0)?;
@@ -331,6 +322,23 @@ impl gb::RomReader for Reader {
         self.ack(&[0xb4], true)?;
         self.mode = 1;
         Ok(())
+    }
+    fn bank_write(&mut self, address: u16, value: u8) -> Result<()> {
+        if self.mode != 1
+            || self.mapper.is_none()
+            || ![0x2000, 0x2100, 0x3000, 0x4000, 0x6000].contains(&address)
+        {
+            return Err(Error::check("Disallowed Game Boy bank register write."));
+        }
+        let mut cmd = vec![0xb2];
+        cmd.extend((address as u32).to_be_bytes());
+        cmd.push(value);
+        self.ack(&cmd, true)
+    }
+}
+impl gb::RomReader for Reader {
+    fn initialize(&mut self) -> Result<()> {
+        self.initialize_gb_at_voltage(false)
     }
     fn header_bytes(&mut self) -> Result<Vec<u8>> {
         self.read_range(0, 0x150)
@@ -515,6 +523,8 @@ mod tests {
         drop_reads: usize,
         pending_timeout: bool,
         flash_id_mode: bool,
+        spansion: bool,
+        cfi_mode: bool,
         flash_pin: usize,
         flash_target_bank: usize,
         flash_configured: bool,
@@ -560,6 +570,8 @@ mod tests {
                 drop_reads: 0,
                 pending_timeout: false,
                 flash_id_mode: false,
+                spansion: false,
+                cfi_mode: false,
                 flash_pin: 0,
                 flash_target_bank: 0,
                 flash_configured: false,
@@ -622,7 +634,7 @@ mod tests {
                     f.flash_id_mode = false;
                 }
                 [0xf2] => {
-                    assert_eq!(f.voltage, if f.gba { 33 } else { 50 });
+                    assert_eq!(f.voltage, if f.gba || f.spansion { 33 } else { 50 });
                     f.power = true;
                     f.bank = 0;
                     f.power_ons += 1;
@@ -636,7 +648,7 @@ mod tests {
                     f.gba = false;
                 }
                 [0xa4] => {
-                    assert!(!f.power && f.gba);
+                    assert!(!f.power && (f.gba || f.spansion));
                     f.voltage = 33;
                 }
                 [0xa5] => {
@@ -660,7 +672,7 @@ mod tests {
                         (1, 0x0c) | (1, 0x10) | (1, 8) | (1, 9) => assert_eq!(v, 0),
                         (4, 1) => assert_eq!(v, 5000),
                         (1, 4) => {
-                            assert_eq!(v, 2);
+                            assert_eq!(v, if f.spansion { 1 } else { 2 });
                             f.flash_pin = v;
                         }
                         (1, 5 | 7 | 10) => assert_eq!(v, 0),
@@ -692,7 +704,9 @@ mod tests {
                         response[0] ^= 1;
                     }
                     if let Some(c) = &f.cancel_on_read {
-                        c.0.store(true, Ordering::Relaxed);
+                        if !f.spansion || f.flash_id_mode {
+                            c.0.store(true, Ordering::Relaxed);
+                        }
                     }
                 }
                 [0xb2, 0, 0, high, low, value] => {
@@ -713,8 +727,21 @@ mod tests {
                     };
                     response = f.rom[offset..offset + f.size].to_vec();
                     if f.flash_id_mode && f.fault != "id" {
-                        assert_eq!((offset, f.size), (0, 2));
-                        response = vec![0xbf, 0xb7];
+                        if f.spansion {
+                            response.fill(0);
+                            response[..4].copy_from_slice(&[1, 1, 0x7e, 0x7e]);
+                        } else {
+                            assert_eq!((offset, f.size), (0, 2));
+                            response = vec![0xbf, 0xb7];
+                        }
+                    }
+                    if f.cfi_mode {
+                        response.fill(0);
+                        response[0x20] = b'Q';
+                        response[0x22] = b'R';
+                        response[0x24] = b'Y';
+                        response[0x26] = 2;
+                        response[0x4e] = 22;
                     }
                     if f.size == 4096
                         && ((f.fault == "backup" && f.power_ons == 2)
@@ -726,15 +753,22 @@ mod tests {
                         response[0] ^= 1;
                     }
                     if let Some(c) = &f.cancel_on_read {
-                        c.0.store(true, Ordering::Relaxed);
+                        if !f.spansion || f.flash_id_mode {
+                            c.0.store(true, Ordering::Relaxed);
+                        }
                     }
                 }
                 [0xd1, 0, 0, 0, 0, 0xf0] => {
-                    assert!(f.power && !f.gba && f.flash_pin == 2);
+                    assert!(f.power && !f.gba && f.flash_pin == if f.spansion { 1 } else { 2 });
                     f.flash_id_mode = false;
+                    f.cfi_mode = false;
+                }
+                [0xd1, 0, 0, 0x0a, 0xaa, 0x98] => {
+                    assert!(f.spansion && f.flash_pin == 1 && f.voltage == 33);
+                    f.cfi_mode = true;
                 }
                 [0xd4, 1, count, commands @ ..] => {
-                    assert!(f.power && !f.gba && f.flash_pin == 2);
+                    assert!(f.power && !f.gba && f.flash_pin == if f.spansion { 1 } else { 2 });
                     assert_eq!(f.bank, 1, "unlock must use physical bank 1");
                     assert_eq!(commands.len(), *count as usize * 6);
                     let pairs: Vec<_> = commands
@@ -749,6 +783,11 @@ mod tests {
                         })
                         .collect();
                     match pairs.as_slice() {
+                        [(0xaaa, 0xaa), (0x555, 0x55), (0xaaa, 0x90)]
+                        | [(0xaaa, 0xa9), (0x555, 0x56), (0xaaa, 0x90)] => {
+                            assert!(f.spansion && f.voltage == 33);
+                            f.flash_id_mode = true;
+                        }
                         [(0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x90)] => f.flash_id_mode = true,
                         [(0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x80), (0x5555, 0xaa), (0x2aaa, 0x55), (0x5555, 0x10)] =>
                         {
@@ -914,6 +953,40 @@ mod tests {
         assert!(!f.borrow().power);
         (result, f, temp)
     }
+    #[test]
+    fn spansion_queries_restore_rom_and_never_enable_programming() {
+        for cancelled in [false, true] {
+            let f = Rc::new(RefCell::new(Firmware {
+                spansion: true,
+                ..Default::default()
+            }));
+            let original = f.borrow().rom.clone();
+            let cancel = Cancel::default();
+            let mut reader =
+                Reader::connect(Box::new(Fake(f.clone())), "/dev/test", cancel.clone()).unwrap();
+            reader.initialize_spansion_mbc5_readonly().unwrap();
+            if cancelled {
+                f.borrow_mut().cancel_on_read = Some(cancel);
+            }
+            let result = reader.inspect_spansion_mbc5_readonly();
+            if cancelled {
+                assert!(result.is_err());
+            } else {
+                let report = result.unwrap();
+                assert_eq!(report["cfi"]["capacity"], 4 * 1024 * 1024);
+                assert_eq!(report["programming_qualified"], false);
+            }
+            assert!(!reader.flash_verified && !reader.program_ready);
+            assert!(!f.borrow().flash_id_mode && !f.borrow().cfi_mode);
+            assert_eq!(f.borrow().rom, original);
+            assert_eq!((f.borrow().erases, f.borrow().programs), (0, 0));
+            assert!(!f.borrow().sent.iter().any(|p| p == &[0xa5]));
+            assert!(gb::FlashWriter::erase(&mut reader).is_err());
+            reader.close().unwrap();
+            assert!(!f.borrow().power);
+        }
+    }
+
     #[test]
     fn flash_write_and_wipe_keep_backups_and_verify_full_capacity() {
         for action in ["write", "wipe"] {
